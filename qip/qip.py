@@ -36,12 +36,12 @@ class Qubit(object):
     def feed(self, inputvals):
         """
         Feeds values through qubit operator.
-        :param inputvals: 2n complex numbers, each set of 2 is one qubit of form a|1> + b|0>
-        :return: 2n complex numbers
+        :param inputvals: 2^n complex numbers for each of |x1 x2 ... xn>
+        :return: 2^n complex numbers
         """
         # Check to make sure enough are given
-        if len(inputvals) != 2*self.n:
-            raise Exception("Incorrect #inputs given: {} versus expected {}".format(len(inputvals), 2*self.n))
+        if len(inputvals) != 2**self.n:
+            raise Exception("Incorrect #inputs given: {} versus expected {}".format(len(inputvals), 2**self.n))
         # Return identity
         return inputvals[:]
 
