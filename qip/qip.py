@@ -36,8 +36,8 @@ class Qubit(object):
     def feed(self, inputvals):
         """
         Feeds values through qubit operator.
-        :param inputvals: 2**n complex numbers for each combo of a|1> + b|0>
-        :return: 2**n complex numbers
+        :param inputvals: 2^n complex numbers for each of |x1 x2 ... xn>
+        :return: 2^n complex numbers
         """
         # Check to make sure enough are given
         if len(inputvals) != 2**self.n:
