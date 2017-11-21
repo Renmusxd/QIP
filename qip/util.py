@@ -18,15 +18,20 @@ def kronselect_dot(mats,vec,n):
         if type(indices) != tuple and type(indices) != int:
             raise Exception("Type of indices must be tuple: {}".format(indices))
         elif type(indices) == tuple:
-            newmats[tuple(sorted(indices))] = numpy.array(mats[indices])
+            m = mats[indices]
+            if type(m) == list:
+                m = numpy.array(m)
+            newmats[indices] = m
             nindices = len(indices)
         elif type(indices) == int:
-            newmats[(indices,)] = numpy.array(mats[indices])
+            m = mats[indices]
+            if type(m) == list:
+                m = numpy.array(m)
+            newmats[(indices,)] = m
             nindices = 1
-        mat = mats[indices]
-        if 2**nindices != mat.shape[0] or 2**nindices != mat.shape[1]:
+        if 2**nindices != m.shape[0] or 2**nindices != m.shape[1]:
             raise Exception("Shape of square submatrix must equal 2**(number of indices): "
-                            "{}: {}".format(indices, mat))
+                            "{}: {}".format(indices, m))
     # Sort all keys and make into tuples
     mats = newmats
 
@@ -61,6 +66,18 @@ def gen_valid_col_and_matcol(row, matindices, n):
         for j,indx in enumerate(matindices):
             colbits[indx] = matcol[j]
         yield (row,bitarray_to_uint(colbits)), {matindices[j]: item for j, item in enumerate(zip(matrow, matcol))}
+
+
+def gen_edit_indices(indices):
+    if len(indices) > 0:
+        indices = list(sorted(indices))
+        maxindex = indices[-1]
+        bits = [0] * (maxindex+1)
+        for i in range(2**len(indices)):
+            flips = uint_to_bitarray(i, len(indices))
+            for j, bit in enumerate(flips):
+                bits[indices[j]] = bit
+            yield bitarray_to_uint(bits), flips
 
 
 def uint_to_bitarray(num, n):
