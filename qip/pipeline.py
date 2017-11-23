@@ -1,5 +1,4 @@
 import numpy
-from qip.util import uint_to_bitarray
 from qip.util import gen_edit_indices
 from qip.util import flatten
 
@@ -13,10 +12,12 @@ def run(*args, **kwargs):
     """
     state = kwargs['state'] if 'state' in kwargs else None
     feed = kwargs['feed'] if 'feed' in kwargs else {}
+    qbits = list(sorted(feed.keys(), key=lambda q: q.qid))
 
     # Frontier contains all qubits required for execution
     # Assume 0 unless in feed
     frontier, graphnodes = get_deps(*args, feed=feed)
+    frontier = list(sorted(frontier, key=lambda q: q.qid))
 
     if state is None:
         qbitindex = {}
@@ -25,12 +26,12 @@ def run(*args, **kwargs):
             qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
             n += qbit.n
 
-        state = numpy.zeros(2**len(frontier))
+        state = numpy.zeros(2**sum(q.n for q in frontier))
 
         # Special case for all the unmentioned qbits
         state[0] = 1.0
 
-        for index, flips in gen_edit_indices(flatten(qbitindex[qbit] for qbit in feed)):
+        for index, flips in gen_edit_indices([qbitindex[qbit] for qbit in qbits]):
             state[index] = 1.0
             for qindex, flip in enumerate(flips):
                 qbit = frontier[qindex]

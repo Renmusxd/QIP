@@ -57,8 +57,9 @@ class TestQubitMethods(unittest.TestCase):
         q1 = Qubit(n=2)
         q2 = Qubit(n=2)
         s = Swap(q1,q2)
-        o = s.run(feed={q1: [1.0, 0.0, 0.0, 0.0], q2: [0.0, 0.0, 0.0, 1.0]})
-        self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
+        o = s.run(feed={q1: [0.0, 1.0, 0.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0]})
+        self.assertEqual(o[1],1.0)
+        self.assertEqual(sum(o),1.0)
 
 
 if __name__ == '__main__':

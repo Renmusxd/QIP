@@ -33,8 +33,10 @@ def kronselect_dot(mats,vec,n):
             raise Exception("Shape of square submatrix must equal 2**(number of indices): "
                             "{}: {}".format(indices, m))
     # Sort all keys and make into tuples
-    mats = newmats
+    return dot_loop(newmats, vec, n)
 
+
+def dot_loop(mats, vec, n):
     output = numpy.zeros(shape=len(vec))
 
     allindices = list(mats.keys())
@@ -68,16 +70,24 @@ def gen_valid_col_and_matcol(row, matindices, n):
         yield (row,bitarray_to_uint(colbits)), {matindices[j]: item for j, item in enumerate(zip(matrow, matcol))}
 
 
-def gen_edit_indices(indices):
-    if len(indices) > 0:
-        indices = list(sorted(indices))
-        maxindex = indices[-1]
+def gen_edit_indices(index_groups):
+    if len(index_groups) > 0:
+        allindices = flatten(index_groups)
+        maxindex = max(allindices)
+
         bits = [0] * (maxindex+1)
-        for i in range(2**len(indices)):
-            flips = uint_to_bitarray(i, len(indices))
+        for i in range(2**len(allindices)):
+            flips = uint_to_bitarray(i, len(allindices))
             for j, bit in enumerate(flips):
-                bits[indices[j]] = bit
-            yield bitarray_to_uint(bits), flips
+                bits[allindices[j]] = flips[j]
+
+            qbit_state_indices = [0] * len(index_groups)
+            indx = 0
+            for j, index_group in enumerate(index_groups):
+                subflips = flips[indx:indx+len(index_group)]
+                qbit_state_indices[j] = bitarray_to_uint(subflips)
+                indx += len(index_group)
+            yield bitarray_to_uint(bits), qbit_state_indices
 
 
 def uint_to_bitarray(num, n):
@@ -85,13 +95,13 @@ def uint_to_bitarray(num, n):
     for i in range(n):
         bits.append(num % 2)
         num = num >> 1
-    return list(reversed(bits))
+    return bits[::-1]
 
 
 def bitarray_to_uint(bits):
     s = 0
-    for i, bit in enumerate(reversed(bits)):
-        s += 2**i if bit else 0
+    for i in range(len(bits)):
+        s += 2**i if bits[len(bits)-i-1] else 0
     return s
 
 
