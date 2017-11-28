@@ -64,7 +64,6 @@ class Swap(MatrixOp):
         b_indices = qbitindex[self.inputs[1]]
         return {tuple(flatten([a_indices,b_indices])): SwapMat(swapn)}
 
-
     def __repr__(self):
         return "Swap({})".format(self._qid)
 
@@ -89,3 +88,24 @@ class SwapMat(object):
 
     def __repr__(self):
         return "SwapMat({})".format(self.n)
+
+
+def C(op):
+    """
+    Constructs the controlled version of a given qubit operation
+    :param op: operation to control
+    :return: A Class C-Op which takes as a first input the controlling qubit and
+    remaining inputs as a normal op.
+    """
+    pass
+
+
+class COp(MatrixOp):
+    def __init__(self, op, *inputs):
+        if len(inputs) < 2:
+            raise ValueError("Not enough input values given.")
+        super().__init__(*inputs)
+        self.op = op(*inputs[1:])
+
+    def makemats(self, qbitindex):
+        pass

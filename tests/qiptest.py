@@ -59,7 +59,7 @@ class TestQubitMethods(unittest.TestCase):
         s = Swap(q1,q2)
         o = s.run(feed={q1: [0.0, 1.0, 0.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0]})
         self.assertEqual(o[1],1.0)
-        self.assertEqual(sum(o),1.0)
+        self.assertEqual(sum(abs(o)),1.0)
 
 
 if __name__ == '__main__':
