@@ -9,7 +9,7 @@ class Qubit(object):
     """
     QID = 0
 
-    def __init__(self, *inputs, n=None, qid=None):
+    def __init__(self, *inputs, n=None, qid=None, nosink=False):
         """
         Create a qubit object
         :param inputs: inputs to qubit, qubit acts as identity on each
@@ -27,11 +27,12 @@ class Qubit(object):
             Qubit.QID += 1
         self._qid = qid
         self.inputs = inputs
-        for item in inputs:
-            item.set_sink(self)
+        if not nosink:
+            for item in inputs:
+                item.set_sink(self)
 
-    def run(self, **kwargs):
-        return run(self, **kwargs)
+    def run(self, state=None, feed=None, **kwargs):
+        return run(self, state=state, feed=feed, **kwargs)
 
     def feed(self, inputvals, qbitindex, n):
         """
@@ -45,6 +46,28 @@ class Qubit(object):
             raise Exception("Incorrect #inputs given: {} versus expected {}".format(len(inputvals), 2**self.n))
         # Return identity
         return inputvals
+
+    def split(self):
+        """
+        Splits output qubits based in inputs.
+        :return: n-tuple where n is the number of inputs
+        """
+        qs = []
+        n = 0
+        qid = None
+        for qbit in self.inputs:
+            qs.append(SplitQubit(n, n+qbit.n, self, qid=qid))
+            qid = qs[-1].qid
+            n += qbit.n
+        return tuple(qs)
+
+    def select_index(self, indices):
+        """
+        May be overridden to modify index selection (see SplitQubit).
+        :param indices: list of indices from all inputs nodes
+        :return:
+        """
+        return indices
 
     def set_sink(self, sink):
         if len(self.sink) == 0 or self.sink[0].qid == sink.qid:
@@ -68,3 +91,13 @@ class Qubit(object):
 
     def __repr__(self):
         return "Q({})".format(self._qid)
+
+
+class SplitQubit(Qubit):
+    def __init__(self, startn, endn, *inputs, **kwargs):
+        super().__init__(*inputs, **kwargs)
+        self.startn = startn
+        self.endn = endn
+
+    def select_index(self, indices):
+        return indices[self.startn:self.endn]

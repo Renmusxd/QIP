@@ -1,4 +1,5 @@
 import numpy
+import collections
 
 
 def kronselect_dot(mats,vec,n):
@@ -90,6 +91,15 @@ def gen_edit_indices(index_groups):
             yield bitarray_to_uint(bits), qbit_state_indices
 
 
+def expand_kron_matrix(mats, n):
+    m = numpy.zeros((2**n, 2**n))
+    for i in range(2**n):
+        v = numpy.zeros((2**n,))
+        v[i] = 1.0
+        m[i, :] = kronselect_dot(mats,v,n)
+    return m
+
+
 def uint_to_bitarray(num, n):
     bits = []
     for i in range(n):
@@ -106,4 +116,5 @@ def bitarray_to_uint(bits):
 
 
 def flatten(list):
-    return [item for sublist in list for item in sublist]
+    listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in list]
+    return [item for sublist in listgen for item in sublist]

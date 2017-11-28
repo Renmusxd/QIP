@@ -1,17 +1,19 @@
 import numpy
+import collections
 from qip.util import gen_edit_indices
 from qip.util import flatten
 
 
-def run(*args, **kwargs):
+def run(*args, state=None, feed=None, **kwargs):
     """
-
-    :param args:
-    :param kwargs:
-    :return:
+    Runs pipeline using all qubits in *args
+    :param args: list of qubits to evaluate
+    :param state: full state of n qbits
+    :param feed: feed of individual qbit states
+    :return: state of full qubit system (2**n array)
     """
-    state = kwargs['state'] if 'state' in kwargs else None
-    feed = kwargs['feed'] if 'feed' in kwargs else {}
+    if feed is None:
+        feed = {}
     qbits = list(sorted(feed.keys(), key=lambda q: q.qid))
 
     # Frontier contains all qubits required for execution
@@ -37,20 +39,23 @@ def run(*args, **kwargs):
                 qbit = frontier[qindex]
                 state[index] = state[index] * feed[qbit][flip]
 
-    return feed_forward(frontier, state, graphnodes)
+    debug = False
+    if 'debug' in kwargs:
+        debug = kwargs['debug']
+    return feed_forward(frontier, state, graphnodes, debug=debug)
 
 
 def get_deps(*args, feed=None):
     if feed is None:
         feed = {}
 
-    seen = set(feed.keys())
+    seen = set()
     deps = set()
     frontier = set(args)
     # Populate frontier
     while len(frontier) > 0:
         node = frontier.pop()
-        if node in seen or len(node.inputs) == 0:
+        if node in feed or len(node.inputs) == 0:
             deps.add(node)
         else:
             frontier.update(node.inputs)
@@ -58,7 +63,7 @@ def get_deps(*args, feed=None):
     return list(deps), seen
 
 
-def feed_forward(frontier, state, graphnodes):
+def feed_forward(frontier, state, graphnodes, debug=False):
     # Condition is that if a node is in the frontier, either all its inputs are
     # in the feed dict, or it itself is.
     qbitindex = {}
@@ -67,10 +72,19 @@ def feed_forward(frontier, state, graphnodes):
     for qbit in sorted(frontier, key=lambda q: q.qid):
         qbitindex[qbit] = [i for i in range(n, n+qbit.n)]
         n += qbit.n
+
+    if debug:
+        print("Start")
+        print(state)
+
     while len(frontier) > 0:
         node = frontier.pop()
         state = node.feed(state,qbitindex,n)
+        if debug:
+            print(node)
+            print(state)
         seen.add(node)
+        # Iterate sink for special cases where "cloning" takes place (i.e. splitting qubits after operation)
         for nextnode in node.sink:
             if nextnode in graphnodes and nextnode not in seen:
                 all_deps = True
@@ -80,7 +94,7 @@ def feed_forward(frontier, state, graphnodes):
                         break
                 if all_deps:
                     frontier.append(nextnode)
-                    if nextnode not in qbitindex:
-                        qbitindex[nextnode] = []
-                    qbitindex[nextnode] += qbitindex[node]
+                    newindices = nextnode.select_index(flatten(qbitindex[n] for n in nextnode.inputs))
+                    qbitindex[nextnode] = newindices
+                    # tuple(newindices) if isinstance(newindices, collections.Iterable) else (newindices,)
     return state
