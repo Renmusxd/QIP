@@ -1,5 +1,4 @@
 import unittest
-from qip.qip import Qubit
 from qip.operators import *
 from qip.pipeline import run
 
@@ -58,8 +57,8 @@ class TestQubitMethods(unittest.TestCase):
         q2 = Qubit(n=2)
         s = Swap(q1,q2)
         o = s.run(feed={q1: [0.0, 1.0, 0.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0]})
-        self.assertEqual(o[1],1.0)
-        self.assertEqual(sum(abs(o)),1.0)
+        self.assertEqual(o[1], 1.0)
+        self.assertEqual(sum(abs(o)), 1.0)
 
     def test_split(self):
         q1 = Qubit(n=1)
@@ -110,6 +109,29 @@ class TestQubitMethods(unittest.TestCase):
 
         # Since all real values, and control is index 1:
         p = numpy.dot(o[:4], o[:4])
+        self.assertLessEqual(abs(p - 1.0), 1e-15)
+
+    def test_cswap_twobitcompare(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=2)
+        q3 = Qubit(n=2)
+
+        h1 = H(q1)
+        c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+        m1 = H(c1)
+
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
+        o = m1.run(feed={q1: [1.0, 0.0], q2: [0.0, 0.0, 0.0, 1.0], q3: [1.0, 0.0, 0.0, 0.0]})
+
+        # Since all real values, and control is index 1:
+        p = numpy.dot(o[:16], o[:16])
+        self.assertLessEqual(abs(p - 0.5), 1e-15)
+
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
+        o = m1.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0], q3: [1.0, 0.0, 0.0, 0.0]})
+
+        # Since all real values, and control is index 1:
+        p = numpy.dot(o[:16], o[:16])
         self.assertLessEqual(abs(p - 1.0), 1e-15)
 
 
