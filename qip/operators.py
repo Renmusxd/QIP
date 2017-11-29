@@ -9,22 +9,24 @@ class MatrixOp(Qubit):
         super().__init__(*inputs, **kwargs)
         self.ms = None
 
-    def feed(self, inputvals, qbitindex, n):
+    def feed(self, inputvals, qbitindex, n, arena):
         """
         Operate on the state of the system.
         :param inputvals: 2**n complex values
         :param qbitindex: mapping of qbit to global index
-        :return: 2**n complex values
+        :param n: number of qubits
+        :param arena: memory arena to use for computations, must be of size 2**n
+        :return: (2**n complex values of applying Q to input, memory arena of size 2**n)
         """
         if self.ms is None:
             self.ms = self.makemats(qbitindex)
-        return kronselect_dot(self.ms, inputvals, n)
+
+        kronselect_dot(self.ms, inputvals, n, arena)
+        return arena, inputvals
 
     def makemats(self, qbitindex):
-        # Identity
-        # return {i: numpy.eye(2)
-        #         for i in flatten([qbitindex[inp] for inp in self.inputs])}
         raise NotImplemented("This method should never be called.")
+
 
 class Not(MatrixOp):
     def __init__(self, *inputs, **kwargs):
@@ -104,6 +106,8 @@ class COp(MatrixOp):
     def __init__(self, op, *inputs, **kwargs):
         if len(inputs) < 2:
             raise ValueError("Not enough input values given.")
+        if inputs[0].n != 1:
+            raise ValueError("Control bit can only be of size n=1")
         self.op = op(*inputs[1:], nosink=True, **kwargs)
         super().__init__(*inputs, qid=self.op.qid, **kwargs)
 

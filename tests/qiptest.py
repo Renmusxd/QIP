@@ -76,7 +76,7 @@ class TestQubitMethods(unittest.TestCase):
         self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 1.0, 0.0]))
 
         # Now both back to normal
-        o = run(f1,f2, feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
+        o = run(f1, f2, feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
 
     def test_cnot(self):
@@ -120,14 +120,14 @@ class TestQubitMethods(unittest.TestCase):
         c1, c2, c3 = C(Swap)(h1, q2, q3).split()
         m1 = H(c1)
 
-        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
         o = m1.run(feed={q1: [1.0, 0.0], q2: [0.0, 0.0, 0.0, 1.0], q3: [1.0, 0.0, 0.0, 0.0]})
 
         # Since all real values, and control is index 1:
         p = numpy.dot(o[:16], o[:16])
         self.assertLessEqual(abs(p - 0.5), 1e-15)
 
-        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1
         o = m1.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0], q3: [1.0, 0.0, 0.0, 0.0]})
 
         # Since all real values, and control is index 1:

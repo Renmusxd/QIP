@@ -34,31 +34,44 @@ class Qubit(object):
     def run(self, state=None, feed=None, **kwargs):
         return run(self, state=state, feed=feed, **kwargs)
 
-    def feed(self, inputvals, qbitindex, n):
+    def feed(self, inputvals, qbitindex, n, arena):
         """
         Operate on the state of the system.
         :param inputvals: 2**n complex values
         :param qbitindex: mapping of qbit to global index
-        :return: 2**n complex values
+        :param n: number of qubits
+        :param arena: memory arena to use for computations, must be of size 2**n
+        :return: (2**n complex values of applying Q to input, memory arena of size 2**n)
         """
         # Check to make sure enough are given
         if len(inputvals) != 2**n:
             raise Exception("Incorrect #inputs given: {} versus expected {}".format(len(inputvals), 2**self.n))
         # Return identity
-        return inputvals
+        return inputvals, arena
 
-    def split(self):
+    def split(self, indexes=None):
         """
         Splits output qubits based in inputs.
         :return: n-tuple where n is the number of inputs
         """
-        qs = []
-        n = 0
+
+        index = 0
+        if indexes is None:
+            indexes = []
+            for qubit in self.inputs:
+                indexes.append(qubit.n + index)
+                index += qubit.n
+
+        indexes = [0] + indexes
         qid = None
-        for qbit in self.inputs:
-            qs.append(SplitQubit(n, n+qbit.n, self, qid=qid))
-            qid = qs[-1].qid
-            n += qbit.n
+        qs = []
+        for i in range(len(indexes)-1):
+            startn = indexes[i]
+            endn = indexes[i+1]
+            sq = SplitQubit(startn, endn, self, qid=qid)
+            qid = sq.qid
+            qs.append(sq)
+
         return tuple(qs)
 
     def select_index(self, indices):

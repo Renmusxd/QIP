@@ -2,14 +2,14 @@ import numpy
 import collections
 
 
-def kronselect_dot(mats,vec,n):
+def kronselect_dot(mats, vec, n, outputarray):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec
     for the case where most mj are identity.
     :param mats: { (indices,...) : mat(2x2) }
     :param vec: vector v of size 2**n
     :param n: total number of matrices (including identities)
-    :return:
+    :param outputarray: array to store output in
     """
     if len(vec) != 2**n:
         raise Exception("Vec must be of length 2**n: {}:{}".format(len(vec), 2**n))
@@ -34,12 +34,10 @@ def kronselect_dot(mats,vec,n):
             raise Exception("Shape of square submatrix must equal 2**(number of indices): "
                             "{}: {}".format(indices, m))
     # Sort all keys and make into tuples
-    return dot_loop(newmats, vec, n)
+    dot_loop(newmats, vec, n, outputarray)
 
 
-def dot_loop(mats, vec, n):
-    output = numpy.zeros(shape=len(vec))
-
+def dot_loop(mats, vec, n, output):
     allindices = list(mats.keys())
     flatindices = list(sorted(set(index for indices in allindices for index in indices)))
 
@@ -66,9 +64,9 @@ def gen_valid_col_and_matcol(row, matindices, n):
     matrow = tuple(rowbits[indx] for indx in matindices)
     for i in range(2**len(matindices)):
         matcol = uint_to_bitarray(i, len(matindices))
-        for j,indx in enumerate(matindices):
+        for j, indx in enumerate(matindices):
             colbits[indx] = matcol[j]
-        yield (row,bitarray_to_uint(colbits)), {matindices[j]: item for j, item in enumerate(zip(matrow, matcol))}
+        yield (row, bitarray_to_uint(colbits)), {matindices[j]: item for j, item in enumerate(zip(matrow, matcol))}
 
 
 def gen_edit_indices(index_groups):
@@ -96,7 +94,7 @@ def expand_kron_matrix(mats, n):
     for i in range(2**n):
         v = numpy.zeros((2**n,))
         v[i] = 1.0
-        m[i, :] = kronselect_dot(mats,v,n)
+        kronselect_dot(mats, v, n, m[i, :])
     return m
 
 

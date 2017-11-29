@@ -73,13 +73,17 @@ def feed_forward(frontier, state, graphnodes, debug=False):
         qbitindex[qbit] = [i for i in range(n, n+qbit.n)]
         n += qbit.n
 
+    if len(state) != 2**n:
+        raise ValueError("Size of state must be 2**n")
+    arena = numpy.ndarray(shape=(2**n,))
+
     if debug:
         print("Start")
         print(state)
 
     while len(frontier) > 0:
         node = frontier.pop()
-        state = node.feed(state,qbitindex,n)
+        state, arena = node.feed(state, qbitindex, n, arena)
         if debug:
             print(node)
             print(state)
@@ -96,5 +100,4 @@ def feed_forward(frontier, state, graphnodes, debug=False):
                     frontier.append(nextnode)
                     newindices = nextnode.select_index(flatten(qbitindex[n] for n in nextnode.inputs))
                     qbitindex[nextnode] = newindices
-                    # tuple(newindices) if isinstance(newindices, collections.Iterable) else (newindices,)
     return state
