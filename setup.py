@@ -7,8 +7,7 @@ from distutils.extension import Extension
 from Cython.Build import cythonize
 import numpy
 
-with open('README.rst') as f:
-    readme = f.read()
+readme = "QIP"
 
 with open('LICENSE') as f:
     license = f.read()

@@ -18,11 +18,11 @@ from libc.stdlib cimport malloc, free
 # We now need to fix a datatype for our arrays. I've used the variable
 # DTYPE for this, which is assigned to the usual NumPy runtime
 # type info object.
-DTYPE = np.float64
+DTYPE = np.complex128
 # "ctypedef" assigns a corresponding compile-time type to DTYPE_t. For
 # every type in the numpy module there's a corresponding compile-time
 # type with a _t-suffix.
-ctypedef np.float64_t DTYPE_t
+ctypedef np.complex128_t DTYPE_t
 
 # To remove dynamic dispatch, use the following enums/structs.
 cdef enum MatrixType:
@@ -36,7 +36,7 @@ cdef struct MatStruct:
 
 
 def cdot_loop(np.ndarray indexgroups, matrices,
-              double[:] vec, int n, double[:] output):
+              double complex[:] vec, int n, double complex[:] output):
     # Check types
     if vec.shape[0] != output.shape[0] or 2**n != vec.shape[0]:
         raise ValueError("Both input and output vectors must be of size 2**n")
@@ -47,7 +47,7 @@ def cdot_loop(np.ndarray indexgroups, matrices,
     cdef MatStruct* cmatrices = <MatStruct*>malloc(len(matrices)*sizeof(MatStruct))
     cdef np.ndarray[np.int_t, ndim=1] indexgroup
     cdef MatStruct mstruct
-    cdef np.ndarray[double,ndim=2,mode="c"] numpy_mat
+    cdef np.ndarray[double complex,ndim=2,mode="c"] numpy_mat
 
     cdef i
     for i in range(len(matrices)):
@@ -139,9 +139,9 @@ def cdot_loop(np.ndarray indexgroups, matrices,
     return output
 
 
-cdef double calc_mat_entry(MatStruct mstruct, int mati, int matj):
+cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj):
     cdef object mobj
-    cdef double* mmat
+    cdef double complex* mmat
     if mstruct.mattype == C_MAT:
         if mati < mstruct.param/2 and matj < mstruct.param/2:
             if mati == matj:
@@ -161,7 +161,7 @@ cdef double calc_mat_entry(MatStruct mstruct, int mati, int matj):
         return 0.0
 
     elif mstruct.mattype == NUMPY_MAT:
-        mmat = <double*>mstruct.pointer
+        mmat = <double complex*>mstruct.pointer
         return mmat[mati*mstruct.param + matj]
 
     elif mstruct.mattype == OTHER:
@@ -177,20 +177,3 @@ cdef int set_bit(int num, int bit_index, int value):
 
 cdef int get_bit(int num, int bit_index):
     return (num >> bit_index) & 1
-
-#
-
-#
-# def uint_to_bitarray(num, n):
-#     bits = []
-#     for i in range(n):
-#         bits.append(num % 2)
-#         num = num >> 1
-#     return bits[::-1]
-#
-#
-# def bitarray_to_uint(bits):
-#     s = 0
-#     for i in range(len(bits)):
-#         s += 2**i if bits[len(bits)-i-1] else 0
-#     return s

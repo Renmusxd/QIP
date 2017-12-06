@@ -28,7 +28,7 @@ def run(*args, state=None, feed=None, **kwargs):
             qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
             n += qbit.n
 
-        state = numpy.zeros(2**sum(q.n for q in frontier))
+        state = numpy.zeros(2**sum(q.n for q in frontier), dtype=numpy.complex128)
 
         # Set all the entries in state to product of matrix entries
         state[0] = 1.0
@@ -74,7 +74,8 @@ def feed_forward(frontier, state, graphnodes, debug=False):
 
     if len(state) != 2**n:
         raise ValueError("Size of state must be 2**n")
-    arena = numpy.ndarray(shape=(2**n,))
+    state = state.astype(numpy.complex128)
+    arena = numpy.ndarray(shape=(2**n,), dtype=numpy.complex128)
 
     if debug:
         print("Start")
