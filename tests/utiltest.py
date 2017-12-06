@@ -2,7 +2,6 @@ import unittest
 import numpy
 from qip.util import *
 
-
 class TestQubitMethods(unittest.TestCase):
 
     def test_simple_kron(self):

@@ -134,6 +134,12 @@ class TestQubitMethods(unittest.TestCase):
         p = numpy.dot(o[:16], o[:16])
         self.assertLessEqual(abs(p - 1.0), 1e-15)
 
+    def test_many_bits(self):
+        q1 = Qubit(n=19)
+        q2 = Qubit(n=1)
+        n2 = Not(q2)
+        o = run(q1, n2, feed={q2: [1.0, 0.0]})
+        self.assertEqual(o[1], numpy.sum(numpy.abs(o)))
 
 if __name__ == '__main__':
     unittest.main()

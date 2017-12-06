@@ -30,13 +30,12 @@ def run(*args, state=None, feed=None, **kwargs):
 
         state = numpy.zeros(2**sum(q.n for q in frontier))
 
-        # Special case for all the unmentioned qbits
+        # Set all the entries in state to product of matrix entries
         state[0] = 1.0
-
         for index, flips in gen_edit_indices([qbitindex[qbit] for qbit in qbits]):
             state[index] = 1.0
             for qindex, flip in enumerate(flips):
-                qbit = frontier[qindex]
+                qbit = qbits[qindex]
                 state[index] = state[index] * feed[qbit][flip]
 
     debug = False

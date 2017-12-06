@@ -81,8 +81,8 @@ class SwapMat(object):
 
     def __getitem__(self, item):
         if type(item) == tuple and len(item) == 2:
-            low_a, high_a = item[0] % (2**self.n), item[0] >> self.n
-            low_b, high_b = item[1] % (2**self.n), item[1] >> self.n
+            low_a, high_a = item[0] & ~(-1 << self.n), item[0] >> self.n
+            low_b, high_b = item[1] & ~(-1 << self.n), item[1] >> self.n
             return 1.0 if low_a == high_b and low_b == high_a else 0.0
 
         else:

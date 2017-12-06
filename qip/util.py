@@ -1,8 +1,9 @@
 import numpy
 import collections
+import qip.ext.kronprod as kronprod
 
 
-def kronselect_dot(mats, vec, n, outputarray):
+def kronselect_dot(mats, vec, n, outputarray, cmode=True):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec
     for the case where most mj are identity.
@@ -33,8 +34,15 @@ def kronselect_dot(mats, vec, n, outputarray):
         if 2**nindices != m.shape[0] or 2**nindices != m.shape[1]:
             raise Exception("Shape of square submatrix must equal 2**(number of indices): "
                             "{}: {}".format(indices, m))
-    # Sort all keys and make into tuples
-    dot_loop(newmats, vec, n, outputarray)
+
+    if cmode:
+        iter_indices = newmats.keys()
+        cindices = numpy.array([numpy.array(x) for x in iter_indices])
+        cmats = numpy.array([newmats[x] for x in iter_indices])
+        kronprod.cdot_loop(cindices, cmats, vec, n, outputarray)
+    else:
+        # Sort all keys and make into tuples
+        dot_loop(newmats, vec, n, outputarray)
 
 
 def dot_loop(mats, vec, n, output):
@@ -51,6 +59,8 @@ def dot_loop(mats, vec, n, output):
                 mat = mats[indices]
                 submati = bitarray_to_uint([mijs[index][0] for index in indices])
                 submatj = bitarray_to_uint([mijs[index][1] for index in indices])
+
+                print(tuple([row, c, submati, submatj, mat[submati, submatj]]))
                 p *= mat[submati, submatj]
             s += p*vec[c]
         output[row] = s
@@ -89,12 +99,12 @@ def gen_edit_indices(index_groups):
             yield bitarray_to_uint(bits), qbit_state_indices
 
 
-def expand_kron_matrix(mats, n):
+def expand_kron_matrix(mats, n, cmode=False):
     m = numpy.zeros((2**n, 2**n))
     for i in range(2**n):
         v = numpy.zeros((2**n,))
         v[i] = 1.0
-        kronselect_dot(mats, v, n, m[i, :])
+        kronselect_dot(mats, v, n, m[i, :], cmode=cmode)
     return m
 
 

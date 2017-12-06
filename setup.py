@@ -3,7 +3,9 @@
 # Learn more: https://github.com/kennethreitz/setup.py
 
 from setuptools import setup, find_packages
-
+from distutils.extension import Extension
+from Cython.Build import cythonize
+import numpy
 
 with open('README.rst') as f:
     readme = f.read()
@@ -20,5 +22,8 @@ setup(
     author_email='sumnernh@gmail.com',
     url='https://github.com/Renmusxd/QIP',
     license=license,
-    packages=find_packages(exclude=('tests',))
+    packages=find_packages(exclude=('tests',)),
+    ext_modules=cythonize(
+        Extension("*", ["qip/ext/*.pyx"], include_dirs = [numpy.get_include()])
+    )
 )
