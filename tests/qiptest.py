@@ -101,14 +101,14 @@ class TestQubitMethods(unittest.TestCase):
         o = m1.run(feed={q1: [1.0, 0.0], q2: [0.0, 1.0], q3: [1.0, 0.0]})
 
         # Since all real values, and control is index 1:
-        p = numpy.dot(o[:4], o[:4])
+        p = numpy.dot(o[:len(o) >> 1], o[:len(o) >> 1])
         self.assertLessEqual(abs(p - 0.5), 1e-15)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
         o = m1.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0], q3: [1.0, 0.0]})
 
         # Since all real values, and control is index 1:
-        p = numpy.dot(o[:4], o[:4])
+        p = numpy.dot(o[:len(o) >> 1], o[:len(o) >> 1])
         self.assertLessEqual(abs(p - 1.0), 1e-15)
 
     def test_cswap_twobitcompare(self):
@@ -124,14 +124,49 @@ class TestQubitMethods(unittest.TestCase):
         o = m1.run(feed={q1: [1.0, 0.0], q2: [0.0, 0.0, 0.0, 1.0], q3: [1.0, 0.0, 0.0, 0.0]})
 
         # Since all real values, and control is index 1:
-        p = numpy.dot(o[:16], o[:16])
+        p = numpy.dot(o[:len(o) >> 1], o[:len(o) >> 1])
         self.assertLessEqual(abs(p - 0.5), 1e-15)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1
         o = m1.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0], q3: [1.0, 0.0, 0.0, 0.0]})
 
         # Since all real values, and control is index 1:
-        p = numpy.dot(o[:16], o[:16])
+        p = numpy.dot(o[:len(o) >> 1], o[:len(o) >> 1])
+        self.assertLessEqual(abs(p - 1.0), 1e-15)
+
+    def test_cswap_5bitcompare(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=5)
+        q3 = Qubit(n=5)
+
+        h1 = H(q1)
+        c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+        m1 = H(c1)
+
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
+        state2 = numpy.zeros((32,))
+        state3 = numpy.zeros((32,))
+
+        state2[0] = 1.0
+        state3[1] = 1.0
+
+        o = m1.run(feed={q1: [1.0, 0.0], q2: state2, q3: state3})
+
+        # Since all real values, and control is index 1:
+        p = numpy.dot(o[:len(o) >> 1], o[:len(o) >> 1])
+        self.assertLessEqual(abs(p - 0.5), 1e-15)
+
+        state2 = numpy.zeros((32,))
+        state3 = numpy.zeros((32,))
+
+        state2[0] = 1.0
+        state3[0] = 1.0
+
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1
+        o = m1.run(feed={q1: [1.0, 0.0], q2: state2, q3: state3})
+
+        # Since all real values, and control is index 1:
+        p = numpy.dot(o[:len(o) >> 1], o[:len(o) >> 1])
         self.assertLessEqual(abs(p - 1.0), 1e-15)
 
     def test_many_bits(self):
@@ -140,6 +175,7 @@ class TestQubitMethods(unittest.TestCase):
         n2 = Not(q2)
         o = run(q1, n2, feed={q2: [1.0, 0.0]})
         self.assertEqual(o[1], numpy.sum(numpy.abs(o)))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -24,6 +24,6 @@ setup(
     license=license,
     packages=find_packages(exclude=('tests',)),
     ext_modules=cythonize(
-        Extension("*", ["qip/ext/*.pyx"], include_dirs = [numpy.get_include()])
+        Extension("*", ["qip/ext/*.pyx"], extra_compile_args=["-O3"], include_dirs=[numpy.get_include()])
     )
 )
