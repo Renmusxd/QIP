@@ -1,8 +1,8 @@
-#QIP
+# QIP
 QIP is a python library for qubit simulation meant to feel like tensorflow or other graph pipeline libraries.
 Users may define a set a qubits and then perform operations on them by constructing objects taking them as input. Since the library currently doesn't use a GPU no session object is required and the graphs may be easily reused.
 
-##Example usage for CSwap inner product:
+## Example usage for CSwap inner product:
 ```python
 # Define 11 qubits
 q1 = Qubit(n=1)
