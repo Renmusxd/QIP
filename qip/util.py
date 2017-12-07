@@ -37,8 +37,8 @@ def kronselect_dot(mats, vec, n, outputarray, cmode=True):
 
     if cmode:
         iter_indices = newmats.keys()
-        cindices = numpy.array([numpy.array(x) for x in iter_indices])
-        cmats = numpy.array([newmats[x] if type(newmats[x])!=numpy.ndarray else newmats[x].astype(numpy.complex128)
+        cindices = numpy.array([numpy.array(x, dtype=numpy.int32) for x in iter_indices])
+        cmats = numpy.array([newmats[x] if type(newmats[x]) != numpy.ndarray else newmats[x].astype(numpy.complex128)
                              for x in iter_indices])
 
         kronprod.cdot_loop(cindices, cmats, vec, n, outputarray)

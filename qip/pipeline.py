@@ -1,5 +1,4 @@
 import numpy
-import collections
 from qip.util import gen_edit_indices
 from qip.util import flatten
 
@@ -21,6 +20,7 @@ def run(*args, state=None, feed=None, **kwargs):
     frontier, graphnodes = get_deps(*args, feed=feed)
     frontier = list(sorted(frontier, key=lambda q: q.qid))
 
+    n = sum(q.n for q in frontier)
     if state is None:
         qbitindex = {}
         n = 0
@@ -28,7 +28,7 @@ def run(*args, state=None, feed=None, **kwargs):
             qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
             n += qbit.n
 
-        state = numpy.zeros(2**sum(q.n for q in frontier), dtype=numpy.complex128)
+        state = numpy.zeros(2**n, dtype=numpy.complex128)
 
         # Set all the entries in state to product of matrix entries
         state[0] = 1.0
@@ -37,6 +37,8 @@ def run(*args, state=None, feed=None, **kwargs):
             for qindex, flip in enumerate(flips):
                 qbit = qbits[qindex]
                 state[index] = state[index] * feed[qbit][flip]
+    elif len(state) != 2**n:
+        raise ValueError("State size must be 2**n")
 
     debug = False
     if 'debug' in kwargs:
@@ -74,19 +76,17 @@ def feed_forward(frontier, state, graphnodes, debug=False):
 
     if len(state) != 2**n:
         raise ValueError("Size of state must be 2**n")
+
     state = state.astype(numpy.complex128)
     arena = numpy.ndarray(shape=(2**n,), dtype=numpy.complex128)
-
-    if debug:
-        print("Start")
-        print(state)
 
     while len(frontier) > 0:
         node = frontier.pop()
         state, arena = node.feed(state, qbitindex, n, arena)
+
         if debug:
             print(node)
-            print(state)
+
         seen.add(node)
         # Iterate sink for special cases where "cloning" takes place (i.e. splitting qubits after operation)
         for nextnode in node.sink:
