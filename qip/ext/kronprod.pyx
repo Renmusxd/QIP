@@ -8,6 +8,7 @@ from libc.stdlib cimport malloc, free
 cdef enum MatrixType:
     OTHER, NUMPY_MAT, C_MAT, SWAP_MAT
 
+
 cdef struct MatStruct:
     MatrixType mattype
     int param
@@ -15,8 +16,8 @@ cdef struct MatStruct:
     void* pointer
 
 
-@cython.boundscheck(False)
 @cython.wraparound(False)
+@cython.boundscheck(False)
 def cdot_loop(int[:,:] indexgroups, matrices,
               double complex[:] vec, int n, double complex[:] output):
     # Check types
@@ -36,7 +37,7 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 
         mstruct.pointer = <void*>mat
 
-        struct_val = 0
+        struct_val = OTHER
         if hasattr(mat, '_kron_struct'):
             struct_val = mat._kron_struct
         elif type(mat) == np.ndarray:
@@ -64,9 +65,8 @@ def cdot_loop(int[:,:] indexgroups, matrices,
     cdef double complex s, p, matentry
     cdef int r, c
     cdef int nindexgroups = len(indexgroups)
-    #cdef np.ndarray[np.int_t, ndim=1] flatindices
-    cdef int[:] flatindices
-    flatindices = np.array(list(sorted(set(index for indices in indexgroups for index in indices))), dtype=np.int32)
+    cdef int[:] flatindices = np.array(list(sorted(set(index for indices in indexgroups for index in indices))),
+                                       dtype=np.int32)
 
     cdef int two_n = 2**n
     cdef int nindices = len(flatindices)
@@ -128,20 +128,19 @@ def cdot_loop(int[:,:] indexgroups, matrices,
         # nogil
         free(cmatrices)
 
-    return output
-
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
     cdef double complex* mmat
     if mstruct.mattype == C_MAT:
-        if mati < mstruct.param/2 and matj < mstruct.param/2:
+        if mati < mstruct.param >> 1 and matj < mstruct.param >> 1:
             if mati == matj:
                 return 1.0
             else:
                 return 0.0
-        elif mati >= mstruct.param/2 and matj >= mstruct.param/2:
+        elif mati >= mstruct.param >> 1 and matj >= mstruct.param >> 1:
+            # In the future try recursively deducing the MatStruct types ahead of time.
             with gil:
                 return (<object>mstruct.pointer)[mati - (mstruct.param >> 1), matj - (mstruct.param>>1)]
         else:
@@ -165,12 +164,9 @@ cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
             raise ValueError("Struct not a valid type: "+str(mstruct.mattype))
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef int set_bit(int num, int bit_index, int value) nogil:
     return num ^ (-(value!=0) ^ num) & (1 << bit_index)
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
+
 cdef int get_bit(int num, int bit_index) nogil:
     return (num >> bit_index) & 1

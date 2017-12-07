@@ -22,7 +22,7 @@ setup(
     url='https://github.com/Renmusxd/QIP',
     license=license,
     packages=find_packages(exclude=('tests',)),
-    ext_modules=cythonize(
-        Extension("*", ["qip/ext/*.pyx"], extra_compile_args=["-O3"], include_dirs=[numpy.get_include()])
-    )
+    ext_modules=cythonize([
+        Extension("qip.ext.*", ["qip/ext/*.pyx"], extra_compile_args=["-O3"], include_dirs=[numpy.get_include()])
+    ])
 )
