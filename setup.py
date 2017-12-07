@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
-
-# Learn more: https://github.com/kennethreitz/setup.py
-
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 from Cython.Build import cythonize
 import numpy
 
-readme = "QIP"
+readme = "QIP: A quantum computing simulation library."
 
 with open('LICENSE') as f:
     license = f.read()
@@ -21,7 +18,7 @@ setup(
     author_email='sumnernh@gmail.com',
     url='https://github.com/Renmusxd/QIP',
     license=license,
-    packages=find_packages(exclude=('tests',)),
+    packages=find_packages(exclude=('tests','benchmark')),
     ext_modules=cythonize([
         Extension("qip.ext.*", ["qip/ext/*.pyx"], extra_compile_args=["-O3"], include_dirs=[numpy.get_include()])
     ])
