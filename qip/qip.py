@@ -25,7 +25,7 @@ class Qubit(object):
         if qid is None:
             qid = Qubit.QID
             Qubit.QID += 1
-        self._qid = qid
+        self.qid = qid
         self.inputs = inputs
         if not nosink:
             for item in inputs:
@@ -98,12 +98,8 @@ class Qubit(object):
         if self.n <= 0:
             raise Exception("Number of qubits must be greater than 0")
 
-    @property
-    def qid(self):
-        return self._qid
-
     def __repr__(self):
-        return "Q({})".format(self._qid)
+        return "Q({})".format(self.qid)
 
 
 class SplitQubit(Qubit):

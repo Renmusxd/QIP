@@ -37,7 +37,7 @@ class Not(MatrixOp):
                 for i in flatten([qbitindex[inp] for inp in self.inputs])}
 
     def __repr__(self):
-        return "Not({})".format(self._qid)
+        return "Not({})".format(self.qid)
 
 
 class H(MatrixOp):
@@ -49,7 +49,7 @@ class H(MatrixOp):
                 for i in flatten([qbitindex[inp] for inp in self.inputs])}
 
     def __repr__(self):
-        return "H({})".format(self._qid)
+        return "H({})".format(self.qid)
 
 
 class Swap(MatrixOp):
@@ -67,7 +67,7 @@ class Swap(MatrixOp):
         return {tuple(flatten([a_indices, b_indices])): SwapMat(swapn)}
 
     def __repr__(self):
-        return "Swap({})".format(self._qid)
+        return "Swap({})".format(self.qid)
 
 
 class SwapMat(object):
