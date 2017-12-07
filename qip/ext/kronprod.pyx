@@ -1,5 +1,4 @@
 from __future__ import division
-import qip.operators as operators
 import numpy as np
 import cython
 cimport numpy as np
@@ -37,20 +36,26 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 
         mstruct.pointer = <void*>mat
 
-        if type(mat) == np.ndarray:
-            mstruct.mattype = NUMPY_MAT
+        struct_val = 0
+        if hasattr(mat, '_kron_struct'):
+            struct_val = mat._kron_struct
+        elif type(mat) == np.ndarray:
+            struct_val = NUMPY_MAT
+
+        mstruct.mattype = struct_val
+        if struct_val == NUMPY_MAT:
             numpy_mat = mat
             mstruct.pointer = <void*> numpy_mat.data
             mstruct.param = mat.shape[0]
-        elif type(mat) == operators.SwapMat:
-            mstruct.mattype = SWAP_MAT
+
+        elif struct_val == SWAP_MAT:
             mstruct.param = mat.n
-        elif type(mat) == operators.CMat:
-            mstruct.mattype = C_MAT
+
+        elif struct_val == C_MAT:
             mstruct.param = mat.shape[0]
             mstruct.pointer = <void*>mat.m
-        else:
-            mstruct.mattype = OTHER
+
+        elif struct_val == OTHER:
             mstruct.param = mat.shape[0]
 
         cmatrices[i] = mstruct
@@ -112,7 +117,6 @@ def cdot_loop(int[:,:] indexgroups, matrices,
                         submatj = set_bit(submatj, (len_indexgroup-1) - matindexindex,
                                           get_bit(colbits, (n-1) - matindex))
                     matentry = calc_mat_entry(mstruct, submati, submatj)
-                    #print(row,colbits,submati,submatj,matentry)
                     p = p*matentry
 
                     # If p == 0.0 then exit early

@@ -184,9 +184,9 @@ class TestQubitMethods(unittest.TestCase):
         n1 = Not(q1)
         n2 = H(q2)
         n3 = Not(q3)
-        o1 = run(n1,n2,n3, feed={q1: [1.0, 0.0], q2: [1.0,0.0],
-                                 q3: [1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]})
-
+        o1 = run(n1,n2,n3, feed={q1: [1.0, 0.0], q2: [1.0, 0.0],
+                                 q3: [1.0, 0.0, 0.0, 0.0,
+                                      0.0, 0.0, 0.0, 0.0]})
 
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
@@ -195,10 +195,12 @@ class TestQubitMethods(unittest.TestCase):
         n2 = H(q2)
         n3 = Not(q3)
         n1 = Not(q1)
-        o2 = run(n1,n2,n3, feed={q1: [1.0, 0.0], q2: [1.0,0.0],
-                                 q3: [1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]})
+        o2 = run(n1,n2,n3, feed={q1: [1.0, 0.0], q2: [1.0, 0.0],
+                                 q3: [1.0, 0.0, 0.0, 0.0,
+                                      0.0, 0.0, 0.0, 0.0]})
 
         self.assertTrue(numpy.array_equal(o1, o2))
+
 
 if __name__ == '__main__':
     unittest.main()

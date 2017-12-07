@@ -71,6 +71,8 @@ class Swap(MatrixOp):
 
 
 class SwapMat(object):
+    _kron_struct = 3
+
     def __init__(self, n):
         """
         Constructs a 2^(2n) x 2^(2n) matrix to swap positions of blocks of n entries.
@@ -124,6 +126,8 @@ class COp(MatrixOp):
 
 
 class CMat(object):
+    _kron_struct = 2
+
     def __init__(self, mat):
         if type(mat) == list:
             self.m = numpy.array(mat)
