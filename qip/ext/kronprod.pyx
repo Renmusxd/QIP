@@ -100,9 +100,10 @@ def cdot_loop(int[:,:] indexgroups, matrices,
                 p = 1.0
                 # Get entry in kron-matrix by multiplying relevant sub-matrices
                 for indexgroupindex in range(nindexgroups):
-                    # cdefed at c-typing speedup
-                    indexgroup = indexgroups[indexgroupindex]
-                    len_indexgroup = len(indexgroup)
+                    # For some reason it's still performing wrap-around and
+                    # bounds checking here.
+                    indexgroup = indexgroups[indexgroupindex,:]
+                    len_indexgroup = indexgroup.shape[0]
 
                     mstruct = cmatrices[indexgroupindex]
 
