@@ -3,6 +3,8 @@ import numpy as np
 import cython
 cimport numpy as np
 from libc.stdlib cimport malloc, free
+import math
+import random
 
 # To remove dynamic dispatch, use the following enums/structs.
 cdef enum MatrixType:
@@ -92,6 +94,7 @@ def cdot_loop(int[:,:] indexgroups, matrices,
             # Generate valid columns and calculate required bitflips
             for i in range(two_nindices):
                 # Edit colbits
+                # TODO add system for getting "next non-zero index on row" for matrices like SWAP which are very sparse.
                 for j in range(nindices):
                     indx = flatindices[j]
                     # colbits[indx] = matcol[j]
@@ -164,6 +167,98 @@ cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
         with gil:
             raise ValueError("Struct not a valid type: "+str(mstruct.mattype))
 
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def measure_probabilities(int[:] indices, int n, double complex[:] vec):
+    measure_p = np.zeros(shape=(2**len(indices),), dtype=np.float64)
+    cdef double[:] p = measure_p
+
+    cdef int len_indices = indices.shape[0]
+    cdef int iter_num = 2**n
+    cdef int i, j
+    cdef int p_index = 0
+    cdef double complex vec_val
+    cdef int index
+
+    with nogil:
+        for i in range(iter_num):
+            vec_val = vec[i]
+            if vec_val == 0.0:
+                continue
+
+            for j in range(len_indices):
+                index = indices[j]
+                p_index = set_bit(p_index, (len_indices-1) - j,
+                                  get_bit(i, (n-1) - indices[j]))
+            p[p_index] = p[p_index] + abs(vec_val.conjugate() * vec_val)
+    return measure_p
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out, measured=None, measured_prob=None):
+    if measured is not None:
+        if not (0 <= measured < 2**indices.shape[0]):
+            raise ValueError("Measured value must be less than 2**len(indices)")
+    if measured_prob is not None:
+        if not 0.0 < measured_prob <= 1.0:
+            raise ValueError("measured_prob must be 0 < p <= 1")
+
+    cdef int i
+    cdef double r
+    if measured_prob is None or measured is None:
+        measure_probs = measure_probabilities(indices, n, vec)
+        if measured is None:
+            r = random.random()
+            for i in range(2**indices.shape[0]):
+                r -= measure_probs[i]
+                if r <= 0:
+                    break
+            measured = i
+        measured_prob = measure_probs[measured]
+
+    cdef int m = measured
+    cdef double p = measured_prob
+    cdef double mult_p = math.sqrt(1.0 / p)
+
+    cdef int n_indices = indices.shape[0]
+    cdef int n_non_indices = n - n_indices
+    cdef int n_out = 2**(n - n_indices)
+    cdef int vec_row
+    cdef int row_mask = 0
+    cdef int indices_inc, non_indices_inc
+    with nogil:
+        for i in range(n_indices):
+            row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
+        for i in range(n_out):
+            vec_row = entwine_bit(n_indices, n_non_indices, m, i, row_mask)
+            out[i] = vec[vec_row] * mult_p
+    return m, p
+
+
+cdef int entwine_bit(int n_indices, int n_non_indices, int v_indices, int v_non_indices, int mask) nogil:
+    cdef int n = n_indices + n_non_indices
+    cdef int indices_mask = 1 << (n_indices - 1)
+    cdef int non_indices_mask = 1 << (n_non_indices - 1)
+    cdef int mask_mask = 1 << (n - 1)
+    cdef int m = 0
+    cdef int j
+    # Push bits on from either non-indices or indices depending on mask
+    for j in range(n):
+        # push
+        m = m << 1
+        # select based on mask
+        if (mask & mask_mask) >> ((n-1) - j):
+            n_indices -= 1
+            m += (v_indices & indices_mask) >> n_indices
+            indices_mask = indices_mask >> 1
+        else:
+            n_non_indices -= 1
+            m += (v_non_indices & non_indices_mask) >> n_non_indices
+            non_indices_mask = non_indices_mask >> 1
+        mask_mask = mask_mask >> 1
+    return m
 
 cdef int set_bit(int num, int bit_index, int value) nogil:
     return num ^ (-(value!=0) ^ num) & (1 << bit_index)

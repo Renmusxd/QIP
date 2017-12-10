@@ -43,6 +43,7 @@ def run(*args, state=None, feed=None, **kwargs):
     debug = False
     if 'debug' in kwargs:
         debug = kwargs['debug']
+
     return feed_forward(frontier, state, graphnodes, debug=debug)
 
 
@@ -79,13 +80,22 @@ def feed_forward(frontier, state, graphnodes, debug=False):
 
     state = state.astype(numpy.complex128)
     arena = numpy.ndarray(shape=(2**n,), dtype=numpy.complex128)
+    classic_map = {}
 
     while len(frontier) > 0:
         node = frontier.pop()
-        state, arena = node.feed(state, qbitindex, n, arena)
 
         if debug:
             print(node)
+
+        state, arena, (n_bits, bits) = node.feed(state, qbitindex, n, arena)
+
+        # Manage measurements
+        qbitindex = node.remap_index(qbitindex, n)
+
+        if n_bits > 0:
+            classic_map[node] = bits
+            n -= n_bits
 
         seen.add(node)
         # Iterate sink for special cases where "cloning" takes place (i.e. splitting qubits after operation)
@@ -98,6 +108,5 @@ def feed_forward(frontier, state, graphnodes, debug=False):
                         break
                 if all_deps:
                     frontier.append(nextnode)
-                    newindices = nextnode.select_index(flatten(qbitindex[n] for n in nextnode.inputs))
-                    qbitindex[nextnode] = newindices
-    return state
+                    qbitindex[nextnode] = nextnode.select_index(flatten(qbitindex[j] for j in nextnode.inputs))
+    return state, classic_map

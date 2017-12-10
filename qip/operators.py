@@ -16,13 +16,13 @@ class MatrixOp(Qubit):
         :param qbitindex: mapping of qbit to global index
         :param n: number of qubits
         :param arena: memory arena to use for computations, must be of size 2**n
-        :return: (2**n complex values of applying Q to input, memory arena of size 2**n)
+        :return: (2**n complex values of applying Q to input, memory arena of size 2**n, (num classic bits, int bits))
         """
         if self.ms is None:
             self.ms = self.makemats(qbitindex)
 
         kronselect_dot(self.ms, inputvals, n, arena)
-        return arena, inputvals
+        return arena, inputvals,  (0, 0)
 
     def makemats(self, qbitindex):
         raise NotImplemented("This method should never be called.")
