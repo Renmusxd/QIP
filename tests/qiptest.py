@@ -33,14 +33,14 @@ class TestQubitMethods(unittest.TestCase):
     def test_multi_not(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
-        s = Not(q1,q2)
+        s = NotOp(q1,q2)
         o, _ = s.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 0.0, 1.0]))
 
     def test_swap(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
-        s = Swap(q1,q2)
+        s = SwapOp(q1,q2)
         o, _ = s.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
 
@@ -56,7 +56,7 @@ class TestQubitMethods(unittest.TestCase):
     def test_swap_twobit(self):
         q1 = Qubit(n=2)
         q2 = Qubit(n=2)
-        s = Swap(q1,q2)
+        s = SwapOp(q1,q2)
         o, _ = s.run(feed={q1: [0.0, 1.0, 0.0, 0.0], q2: [1.0, 0.0, 0.0, 0.0]})
         self.assertEqual(o[1], 1.0)
         self.assertEqual(sum(abs(o)), 1.0)
@@ -64,8 +64,7 @@ class TestQubitMethods(unittest.TestCase):
     def test_split(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
-        n = Not(q1, q2)
-        n1, n2 = n.split()
+        n1, n2 = Not(q1, q2)
         f1 = Not(n1)
         f2 = Not(n2)
         # f1 should be back to q1 whereas n2 should be negated.
@@ -83,10 +82,10 @@ class TestQubitMethods(unittest.TestCase):
     def test_cnot(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
-        c = C(Not)(q1, q2)
-        o, _ = c.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
+        c1, c2 = C(Not)(q1, q2)
+        o, _ = run(c1, c2, feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
-        o,_ = c.run(feed={q1: [0.0, 1.0], q2: [1.0, 0.0]})
+        o,_ = run(c1, c2, feed={q1: [0.0, 1.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 0.0, 1.0]))
 
     def test_cswap_compare(self):
@@ -95,7 +94,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=1)
 
         h1 = H(q1)
-        c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
         m1 = H(c1)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
@@ -118,7 +117,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=2)
 
         h1 = H(q1)
-        c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
         m1 = H(c1)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
@@ -141,7 +140,8 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=5)
 
         h1 = H(q1)
-        c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+
+        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
         m1 = H(c1)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
@@ -208,7 +208,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=2)
 
         h1 = H(q1)
-        c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
         mh1 = H(c1)
 
         m1 = Measure(mh1)
@@ -219,6 +219,23 @@ class TestQubitMethods(unittest.TestCase):
 
         self.assertAlmostEqual(measured_prob, 0.5)
 
+    def test_cswap_reorder_measure(self):
+        # Double check that indices aren't being messed up.
+        q2 = Qubit(n=2)
+        q1 = Qubit(n=1)
+        q3 = Qubit(n=2)
+
+        h1 = H(q1)
+        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+        mh1 = H(c1)
+
+        m1 = Measure(mh1)
+
+        # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
+        o, classic = m1.run(feed={q1: [1.0, 0.0], q2: [0.0, 0.0, 0.0, 1.0], q3: [1.0, 0.0, 0.0, 0.0]})
+        measured, measured_prob = classic[m1]
+
+        self.assertAlmostEqual(measured_prob, 0.5)
 
 
 if __name__ == '__main__':

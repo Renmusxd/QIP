@@ -28,7 +28,14 @@ class MatrixOp(Qubit):
         raise NotImplemented("This method should never be called.")
 
 
-class Not(MatrixOp):
+def Not(*inputs, **kwargs):
+    n = NotOp(*inputs, **kwargs)
+    if len(inputs) > 1:
+        return n.split()
+    return n
+
+
+class NotOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
 
@@ -40,7 +47,14 @@ class Not(MatrixOp):
         return "Not({})".format(self.qid)
 
 
-class H(MatrixOp):
+def H(*inputs, **kwargs):
+    h = HOp(*inputs, **kwargs)
+    if len(inputs) > 1:
+        return h.split()
+    return h
+
+
+class HOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
 
@@ -52,7 +66,14 @@ class H(MatrixOp):
         return "H({})".format(self.qid)
 
 
-class Swap(MatrixOp):
+def Swap(*inputs, **kwargs):
+    s = SwapOp(*inputs, **kwargs)
+    if len(inputs) > 1:
+        return s.split()
+    return s
+
+
+class SwapOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
         if len(self.inputs) != 2:
@@ -101,7 +122,7 @@ def C(op):
     :return: A Class C-Op which takes as a first input the controlling qubit and
     remaining inputs as a normal op.
     """
-    return lambda *inputs: COp(op, *inputs)
+    return lambda *inputs: COp(op, *inputs).split()
 
 
 class COp(MatrixOp):

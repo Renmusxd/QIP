@@ -16,7 +16,7 @@ h1 = H(q1)
 # of H(q1) as the control bit. Notice that Swap is its own
 # operation and CSwap is constructed by applying C(...) to 
 # the swap operation.
-c1, c2, c3 = C(Swap)(h1, q2, q3).split()
+c1, c2, c3 = C(SwapOp)(h1, q2, q3)
 
 # Finally perform another Hadamard transform on qubit 1
 m1 = H(c1)
