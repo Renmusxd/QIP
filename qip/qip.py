@@ -88,6 +88,7 @@ class Qubit(PipelineObject):
                 index += qubit.n
 
         indexes = [0] + indexes
+
         qid = None
         qs = []
         for i in range(len(indexes) - 1):
@@ -134,7 +135,7 @@ class Qubit(PipelineObject):
 
 class SplitQubit(Qubit):
     def __init__(self, indices, *inputs, **kwargs):
-        super().__init__(*inputs, **kwargs)
+        super().__init__(*inputs, n=len(indices), **kwargs)
         self.indices = indices
 
     def select_index(self, indices):

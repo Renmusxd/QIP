@@ -1,6 +1,7 @@
 from qip.qip import Qubit
 from qip.util import kronselect_dot
 from qip.util import flatten
+from qip.ext.func_apply import func_apply
 import numpy
 
 
@@ -122,7 +123,10 @@ def C(op):
     :return: A Class C-Op which takes as a first input the controlling qubit and
     remaining inputs as a normal op.
     """
-    return lambda *inputs: COp(op, *inputs).split()
+    if issubclass(type(op), MatrixOp) or True:
+        return lambda *inputs: COp(op, *inputs).split()
+    else:
+        raise Exception("COp currently only works with matrix operations.")
 
 
 class COp(MatrixOp):
@@ -168,3 +172,22 @@ class CMat(object):
                 return 0.0
         else:
             raise ValueError("CMat can only be indexed with M[i,j] not M[{}]".format(item))
+
+
+def F(func, reg1, reg2, **kwargs):
+    f = FOp(func, reg1, reg2, **kwargs)
+    return f.split()
+
+
+class FOp(Qubit):
+    def __init__(self, func, reg1, reg2, **kwargs):
+        super().__init__(reg1, reg2, **kwargs)
+        self.func = func
+        self.reg1 = reg1
+        self.reg2 = reg2
+
+    def feed(self, inputvals, qbitindex, n, arena):
+        reg1 = numpy.array(qbitindex[self.reg1], dtype=numpy.int32)
+        reg2 = numpy.array(qbitindex[self.reg2], dtype=numpy.int32)
+        func_apply(reg1, reg2, self.func, inputvals, n, arena)
+        return arena, inputvals, (0, 0)

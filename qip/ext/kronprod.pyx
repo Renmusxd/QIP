@@ -181,8 +181,6 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
     cdef int i, j
     cdef int p_index = 0
     cdef double complex vec_val
-    cdef int index
-
     with nogil:
         for i in range(iter_num):
             vec_val = vec[i]
@@ -190,7 +188,7 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
                 continue
 
             for j in range(len_indices):
-                index = indices[j]
+                # index = indices[j]
                 p_index = set_bit(p_index, (len_indices-1) - j,
                                   get_bit(i, (n-1) - indices[j]))
             p[p_index] = p[p_index] + abs(vec_val.conjugate() * vec_val)

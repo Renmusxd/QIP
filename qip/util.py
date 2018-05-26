@@ -128,3 +128,34 @@ def bitarray_to_uint(bits):
 def flatten(list):
     listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in list]
     return [item for sublist in listgen for item in sublist]
+
+
+def qubit_index_notation(i, *qns, n=None):
+    if n is None:
+        n = sum(qns)
+    index_array = []
+    bit_array = uint_to_bitarray(i, n)
+    start_indx = 0
+    for qubit_size in qns:
+        num = bitarray_to_uint(bit_array[start_indx:start_indx + qubit_size])
+        index_array.append(num)
+        start_indx += qubit_size
+    return index_array
+
+
+def gen_qubit_prints(state, *qs):
+    qubit_sizes = []
+    for q in qs:
+        if type(q) == int:
+            qubit_sizes.append(q)
+        else:
+            qubit_sizes.append(q.n)
+    n = sum(qubit_sizes)
+    for i in range(len(state)):
+        if state[i] == 0:
+            continue
+        s = "|"
+        s += ",".join(map(str,qubit_index_notation(i,*qubit_sizes,n=n)))
+        s += "> = {}".format(state[i])
+        yield s
+
