@@ -59,7 +59,6 @@ def quantum(a, N):
 
     o_qfft, _ = qft.run(feed={reg1: reg1_init, reg2: reg2_init})
 
-
     ps = measure_probabilities(numpy.array(list(range(0,q)), dtype=numpy.int32), 2*q, o_qfft)
     for s in gen_qubit_prints(ps, q):
         print(s)

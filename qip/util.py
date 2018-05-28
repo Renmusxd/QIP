@@ -7,7 +7,7 @@ def kronselect_dot(mats, vec, n, outputarray, cmode=True):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec
     for the case where most mj are identity.
-    :param mats: { (indices,...) : mat(2x2) }
+    :param mats: { (indices,... #m) : mat(2**m x 2**m) }
     :param vec: vector v of size 2**n
     :param n: total number of matrices (including identities)
     :param outputarray: array to store output in
@@ -17,6 +17,10 @@ def kronselect_dot(mats, vec, n, outputarray, cmode=True):
 
     newmats = {}
     for indices in mats:
+        # Will be set by one of the paths
+        nindices = 0
+        m = None
+
         if type(indices) != tuple and type(indices) != int:
             raise Exception("Type of indices must be tuple: {}".format(indices))
         elif type(indices) == tuple:
@@ -31,6 +35,7 @@ def kronselect_dot(mats, vec, n, outputarray, cmode=True):
                 m = numpy.array(m)
             newmats[(indices,)] = m
             nindices = 1
+
         if 2**nindices != m.shape[0] or 2**nindices != m.shape[1]:
             raise Exception("Shape of square submatrix must equal 2**(number of indices): "
                             "{}: {}".format(indices, m))

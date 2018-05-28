@@ -60,11 +60,29 @@ class HOp(MatrixOp):
         super().__init__(*inputs, **kwargs)
 
     def makemats(self, qbitindex):
+        # TODO: fix so that H(multiple qubits) meets the standard and isn't just H on each.
         return {i: (1/numpy.sqrt(2))*numpy.array([[1, 1], [1, -1]])
                 for i in flatten([qbitindex[inp] for inp in self.inputs])}
 
     def __repr__(self):
         return "H({})".format(self.qid)
+
+
+def R(phi, *inputs, **kwargs):
+    r = ROp(phi, *inputs, **kwargs)
+    if len(inputs) > 1:
+        return r.split()
+    return r
+
+
+class ROp(MatrixOp):
+    def __init__(self, phi, *inputs, **kwargs):
+        super().__init__(*inputs, **kwargs)
+        self.exponented = numpy.exp(1.0j * phi)
+
+    def makemats(self, qbitindex):
+        return {i: numpy.array([[1, 0], [0, self.exponented]])
+                for i in flatten([qbitindex[inp] for inp in self.inputs])}
 
 
 def Swap(*inputs, **kwargs):

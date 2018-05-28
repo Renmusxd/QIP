@@ -1,8 +1,28 @@
 from qip.qip import Qubit
+from qip.operators import H, C, R
 from qip.ext.qfft import qfft, qifft
 from qip.util import flatten
 import numpy
 
+
+def QFFT(*inputs, **kwargs):
+    """
+    Implementation of Quantum Fourier Transform using H and Rphi gates.
+    :return:
+    """
+    makeR = lambda phi: (lambda *inputs, **kwargs: R(phi, *inputs, **kwargs))
+
+    qarr = list(inputs)
+    for i in range(len(inputs)):
+        # Apply rotations
+        for j in range(i - 1):
+            phi = numpy.pi / (2 ** (i - j))
+            qarr[i], qarr[j] = C(makeR(phi))(qarr[i], qarr[j], **kwargs)
+        # Apply Hadamard
+        qarr[i] = H(qarr[i], **kwargs)
+    return tuple(qarr)
+
+# Experimental code for using numpy's qfft library.
 
 class QFFTOp(Qubit):
     def __init__(self, *inputs, **kwargs):
@@ -40,14 +60,16 @@ class QIFFTOp(Qubit):
         return arena, inputvals, (0, 0)
 
 
-def QFFT(*inputs, **kwargs):
+# FFTs using the specialized op instead of successive H + C(rotation)s.
+# May have uses, though recursive version is more real.
+def pyQFFT(*inputs, **kwargs):
     n = QFFTOp(*inputs, **kwargs)
     if len(inputs) > 1:
         return n.split()
     return n
 
 
-def QIFFT(*inputs, **kwargs):
+def pyQIFFT(*inputs, **kwargs):
     n = QIFFTOp(*inputs, **kwargs)
     if len(inputs) > 1:
         return n.split()

@@ -39,6 +39,8 @@ def run(*args, state=None, feed=None, **kwargs):
                 state[index] = state[index] * feed[qbit][flip]
     elif len(state) != 2**n:
         raise ValueError("State size must be 2**n")
+    elif type(state) == list:
+        state = numpy.array(state)
 
     debug = False
     if 'debug' in kwargs:
