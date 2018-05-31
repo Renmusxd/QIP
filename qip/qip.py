@@ -1,14 +1,15 @@
 from .pipeline import run
 import numpy
-from qip.ext.kronprod import measure
+from qip.ext.kronprod import measure, measure_probabilities
 from qip.util import flatten
 
 
 class PipelineObject(object):
-    def __init__(self, quantum):
+    def __init__(self, quantum, default=None):
         self.quantum = quantum
         self.inputs = []
         self.sink = []
+        self.default = default
 
     def run(self, state=None, feed=None, **kwargs):
         return run(self, state=state, feed=feed, **kwargs)
@@ -26,7 +27,7 @@ class PipelineObject(object):
         if len(inputvals) != 2 ** n:
             raise Exception("Incorrect #inputs given: {} versus expected {}".format(len(inputvals), 2 ** n))
         # Return identity
-        return inputvals, arena, (0, 0)
+        return inputvals, arena, (0, None)
 
     def select_index(self, indices):
         """
@@ -45,6 +46,18 @@ class PipelineObject(object):
         """
         return index_map
 
+    def set_sink(self, sink):
+        if len(self.sink) == 0 or self.sink[0].qid == sink.qid:
+            self.sink += [sink]
+        else:
+            raise Exception("Qubits may only sink to one output (no cloning)")
+
+    def get_inputs(self):
+        return self.inputs
+
+    def apply(self, op):
+        return op(self)
+
 
 class Qubit(PipelineObject):
     """QIDs are used to ensure the no-cloning theorem holds.
@@ -53,14 +66,14 @@ class Qubit(PipelineObject):
     """
     QID = 0
 
-    def __init__(self, *inputs, n=None, qid=None, nosink=False):
+    def __init__(self, *inputs, n=None, qid=None, nosink=False, default=None, quantum=True):
         """
         Create a qubit object
         :param inputs: inputs to qubit, qubit acts as identity on each
         :param n: number of qubits this object represents, set by inputs if given
         :param qid: forces qid value. For internal use or cloning.
         """
-        super().__init__(True)
+        super().__init__(quantum, default=default)
         if n is None:
             n = sum(q.n for q in inputs)
         self.n = n
@@ -74,26 +87,31 @@ class Qubit(PipelineObject):
             for item in inputs:
                 item.set_sink(self)
 
-    def split(self, indexes=None):
+    def split(self, indices=None):
         """
-        Splits output qubits based in inputs.
+        Splits output qubits based on inputs.
         :return: n-tuple where n is the number of inputs
         """
 
-        index = 0
-        if indexes is None:
-            indexes = []
+        if indices is None:
+            indices = []
+            index = 0
             for qubit in self.inputs:
-                indexes.append(qubit.n + index)
+                indices.append(qubit.n + index)
                 index += qubit.n
+        else:
+            indices = list(sorted(indices))
 
-        indexes = [0] + indexes
+        if 0 not in indices:
+            indices = [0] + indices
+        if self.n not in indices:
+            indices = indices + [self.n]
 
         qid = None
         qs = []
-        for i in range(len(indexes) - 1):
-            startn = indexes[i]
-            endn = indexes[i + 1]
+        for i in range(len(indices) - 1):
+            startn = indices[i]
+            endn = indices[i + 1]
             sq = SplitQubit(list(range(startn, endn)), self, qid=qid)
             qid = sq.qid
             qs.append(sq)
@@ -113,18 +131,6 @@ class Qubit(PipelineObject):
         qs = SplitQubit([i for i in range(self.n) if i not in indices and 0 <= i < self.n], self, qid=sq.qid)
         return sq, qs
 
-    def set_sink(self, sink):
-        if len(self.sink) == 0 or self.sink[0].qid == sink.qid:
-            self.sink += [sink]
-        else:
-            raise Exception("Qubits may only sink to one output (no cloning)")
-
-    def get_inputs(self):
-        return self.inputs
-
-    def apply(self, op):
-        return op(self)
-
     def check(self):
         if self.n <= 0:
             raise Exception("Number of qubits must be greater than 0")
@@ -143,10 +149,7 @@ class SplitQubit(Qubit):
 
 
 class Measure(PipelineObject):
-    """
-    Measures some quantum input.
-
-    """
+    """Measures some quantum input."""
 
     def __init__(self, *inputs, measure_by=None, nosink=False):
         super().__init__(False)
@@ -166,7 +169,7 @@ class Measure(PipelineObject):
         :param n: number of qubits
         :param arena: memory arena to use for computations, must be of size 2**n
         :return: (2**(n-m) complex values of applying Q to input, memory arena of size 2**(n-m), (m, bits)) where
-            m is the number of qubits being measured.
+                 m is the number of qubits being measured.
         """
         # Get indices and make measurement
         indices = numpy.array(flatten(qbitindex[q] for q in self.inputs), dtype=numpy.int32)
@@ -201,6 +204,40 @@ class Measure(PipelineObject):
                 removed_so_far += 1
 
         return {q: [index_to_index_map[i] for i in index_map[q]] for q in index_map}
+
+    def __repr__(self):
+        return "M({})".format(",".join(i.__repr__() for i in self.inputs))
+
+
+class StochasticMeasure(Qubit):
+    """
+    Measures some quantum input. Outputs the probability distribution
+    as though the measurement was carried out repeatedly.
+    Does not change state.
+    """
+
+    def __init__(self, *inputs, nosink=False):
+        super().__init__(*inputs, quantum=False, nosink=nosink)
+
+        if not nosink:
+            for item in inputs:
+                item.set_sink(self)
+
+    def feed(self, inputvals, qbitindex, n, arena):
+        """
+        Operate on the state of the system.
+        :param inputvals: 2**n complex values
+        :param qbitindex: mapping of qbit to global index
+        :param n: number of qubits
+        :param arena: memory arena to use for computations, must be of size 2**n
+        :return: (2**(n-m) complex values of applying Q to input, memory arena of size 2**(n-m), (m, bits)) where
+                 m is the number of qubits being measured.
+        """
+        # Get indices and make measurement
+        indices = numpy.array(flatten(qbitindex[q] for q in self.inputs), dtype=numpy.int32)
+        probs = measure_probabilities(indices, n, inputvals)
+
+        return inputvals, arena, (0, probs)
 
     def __repr__(self):
         return "M({})".format(",".join(i.__repr__() for i in self.inputs))

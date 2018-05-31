@@ -23,7 +23,7 @@ class MatrixOp(Qubit):
             self.ms = self.makemats(qbitindex)
 
         kronselect_dot(self.ms, inputvals, n, arena)
-        return arena, inputvals,  (0, 0)
+        return arena, inputvals,  (0, None)
 
     def makemats(self, qbitindex):
         raise NotImplemented("This method should never be called.")
@@ -111,6 +111,7 @@ class SwapOp(MatrixOp):
 
 
 class SwapMat(object):
+    """Contains special logic in the qip.ext.kronprod code"""
     _kron_struct = 3
 
     def __init__(self, n):
@@ -148,6 +149,8 @@ def C(op):
 
 
 class COp(MatrixOp):
+    """Contains special logic in the qip.ext.kronprod code"""
+
     def __init__(self, op, *inputs, **kwargs):
         if len(inputs) < 2:
             raise ValueError("Not enough input values given.")
@@ -208,4 +211,7 @@ class FOp(Qubit):
         reg1 = numpy.array(qbitindex[self.reg1], dtype=numpy.int32)
         reg2 = numpy.array(qbitindex[self.reg2], dtype=numpy.int32)
         func_apply(reg1, reg2, self.func, inputvals, n, arena)
-        return arena, inputvals, (0, 0)
+        return arena, inputvals, (0, None)
+
+    def __repr__(self):
+        return "F({}, {})".format(self.reg1, self.reg2)

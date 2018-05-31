@@ -1,5 +1,5 @@
 import unittest
-from qip.qip import Qubit, Measure
+from qip.qip import Qubit, Measure, StochasticMeasure
 from qip.operators import *
 from qip.pipeline import run
 
@@ -79,6 +79,17 @@ class TestQubitMethods(unittest.TestCase):
         o, _ = run(f1, f2, feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
 
+    def test_allsplit(self):
+        n = 5
+        q = Qubit(n=n)
+        qs = q.split(range(n+1))
+        self.assertEqual(len(qs), n)
+        newq = Qubit(*qs)
+
+        state = numpy.cos(numpy.linspace(0,numpy.pi,2**n))
+        o, _ = run(newq, feed={q: state})
+        self.assertTrue(numpy.array_equal(state, o))
+
     def test_cnot(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
@@ -87,6 +98,17 @@ class TestQubitMethods(unittest.TestCase):
         self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
         o,_ = run(c1, c2, feed={q1: [0.0, 1.0], q2: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 0.0, 1.0]))
+
+    def test_default(self):
+        # Default value setup
+        q1 = Qubit(n=1, default=[0.0, 1.0])
+        q2 = Qubit(n=1)
+        o1, _ = run(q1, q2)
+        # Feed setup
+        q3 = Qubit(n=1)
+        q4 = Qubit(n=1)
+        o2, _ = run(q3, q4, feed={q3: [0.0, 1.0]})
+        self.assertTrue(numpy.array_equal(o1, o2))
 
     def test_cswap_compare(self):
         q1 = Qubit(n=1)
@@ -236,6 +258,16 @@ class TestQubitMethods(unittest.TestCase):
         measured, measured_prob = classic[m1]
 
         self.assertAlmostEqual(measured_prob, 0.5)
+
+    def test_measure_stochastic(self):
+        q1 = Qubit(n=2)
+        q2 = Qubit(n=2)
+
+        m1 = StochasticMeasure(q2)
+
+        _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
+                                 q2: [0.5, 0.5, 0.5, 0.5]})
+        self.assertTrue(numpy.array_equal(c[m1], [0.25,0.25,0.25,0.25]))
 
 
 if __name__ == '__main__':

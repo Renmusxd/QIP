@@ -3,7 +3,7 @@ from qip.util import gen_edit_indices
 from qip.util import flatten
 
 
-def run(*args, state=None, feed=None, **kwargs):
+def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, **kwargs):
     """
     Runs pipeline using all qubits in *args
     :param args: list of qubits to evaluate
@@ -13,11 +13,17 @@ def run(*args, state=None, feed=None, **kwargs):
     """
     if feed is None:
         feed = {}
-    qbits = list(sorted(feed.keys(), key=lambda q: q.qid))
+    else:
+        feed = feed.copy()
 
     # Frontier contains all qubits required for execution
     # Assume 0 unless in feed
     frontier, graphnodes = get_deps(*args, feed=feed)
+    for qubit in frontier:
+        if qubit not in feed and qubit.default is not None:
+            feed[qubit] = qubit.default
+
+    qbits = list(sorted(feed.keys(), key=lambda q: q.qid))
     frontier = list(sorted(frontier, key=lambda q: q.qid))
 
     n = sum(q.n for q in frontier)
@@ -42,11 +48,7 @@ def run(*args, state=None, feed=None, **kwargs):
     elif type(state) == list:
         state = numpy.array(state)
 
-    debug = False
-    if 'debug' in kwargs:
-        debug = kwargs['debug']
-
-    return feed_forward(frontier, state, graphnodes, debug=debug)
+    return feed_forward(frontier, state, graphnodes, debug=debug, statetype=statetype)
 
 
 def get_deps(*args, feed=None):
@@ -67,7 +69,7 @@ def get_deps(*args, feed=None):
     return list(deps), seen
 
 
-def feed_forward(frontier, state, graphnodes, debug=False):
+def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128, debug=False):
     # Condition is that if a node is in the frontier, either all its inputs are
     # in the feed dict, or it itself is.
     qbitindex = {}
@@ -80,8 +82,8 @@ def feed_forward(frontier, state, graphnodes, debug=False):
     if len(state) != 2**n:
         raise ValueError("Size of state must be 2**n")
 
-    state = state.astype(numpy.complex128)
-    arena = numpy.ndarray(shape=(2**n,), dtype=numpy.complex128)
+    state = state.astype(statetype)
+    arena = numpy.ndarray(shape=(2**n,), dtype=statetype)
     classic_map = {}
 
     while len(frontier) > 0:
@@ -92,10 +94,13 @@ def feed_forward(frontier, state, graphnodes, debug=False):
 
         state, arena, (n_bits, bits) = node.feed(state, qbitindex, n, arena)
 
+        tot = numpy.sum(numpy.power(numpy.abs(state),2))
+        print(node, tot)
+
         # Manage measurements
         qbitindex = node.remap_index(qbitindex, n)
 
-        if n_bits > 0:
+        if n_bits > 0 or bits is not None:
             classic_map[node] = bits
             n -= n_bits
 

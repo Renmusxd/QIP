@@ -12,7 +12,8 @@ def QFFT(*inputs, **kwargs):
     """
     makeR = lambda phi: (lambda *inputs, **kwargs: R(phi, *inputs, **kwargs))
 
-    qarr = list(inputs)
+    # Make into array of qubits of n=1
+    qarr = flatten([inp.split(range(inp.n)) for inp in inputs])
     for i in range(len(inputs)):
         # Apply rotations
         for j in range(i - 1):
@@ -20,10 +21,21 @@ def QFFT(*inputs, **kwargs):
             qarr[i], qarr[j] = C(makeR(phi))(qarr[i], qarr[j], **kwargs)
         # Apply Hadamard
         qarr[i] = H(qarr[i], **kwargs)
-    return tuple(qarr)
+
+    # Regroup by original qubits
+    outputqarr = []
+    index = 0
+    for qubit in inputs:
+        outputqarr.append(Qubit(*(qarr[index:index+qubit.n])))
+        index += qubit.n
+
+    if len(outputqarr) > 1:
+        return tuple(outputqarr)
+    else:
+        return outputqarr[0]
+
 
 # Experimental code for using numpy's qfft library.
-
 class QFFTOp(Qubit):
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)

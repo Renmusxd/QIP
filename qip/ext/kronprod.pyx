@@ -19,6 +19,12 @@ cdef struct MatStruct:
     # A pointer to the original mat (except for CMAT)
     void* pointer
 
+def count_cmats(mat, count=0):
+    if hasattr(mat, '_kron_struct'):
+        struct_val = mat._kron_struct
+        if struct_val == C_MAT:
+            return count_cmats(mat.m, count) + 1
+    return count + 1
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -41,12 +47,15 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 
         mstruct.pointer = <void*>mat
 
+        # Find type of matrix
         struct_val = OTHER
         if hasattr(mat, '_kron_struct'):
             struct_val = mat._kron_struct
+
         elif type(mat) == np.ndarray:
             struct_val = NUMPY_MAT
 
+        # Create struct from matrix
         mstruct.mattype = struct_val
         if struct_val == NUMPY_MAT:
             numpy_mat = mat

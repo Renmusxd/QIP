@@ -1,18 +1,17 @@
 from qip.qip import *
 from qip.operators import *
 from qip.util import gen_qubit_prints
-from qip.qfft import QFFT, QIFFT
+from qip.qfft import QFFT
 from qip.ext.kronprod import measure_probabilities
+from qip.pipeline import run
 import numpy
 import math
 import random
+from matplotlib import pyplot
+
 
 MAX_QUBITS = 28
 MAXN = numpy.ceil(numpy.power(2**(MAX_QUBITS - 2), 0.25))
-
-class Umod(Qubit):
-    def __init__(self, *inputs):
-        super().__init__(*inputs)
 
 
 def classical(N):
@@ -38,6 +37,30 @@ def classical(N):
             print("Found a={}!".format(a))
             return a
 
+def make_circuit(m,n, x, N):
+    """
+    Make a quantum circuit with m,n qubits
+    :param m: qubits in register 1
+    :param n: qubits in register 2
+    :return: input qubits and output qubits
+    """
+
+    # Instead of QFFT just initialize to (1/sqrt(2**m))|x>
+    default_state = numpy.ones((2 ** m,))*(numpy.power((2 ** m), -1.0 / 2.0))
+    reg1 = Qubit(n=m, default=default_state)  # Superposition of each |i>
+    reg2 = Qubit(n=n)  # Will hold |f(i)>, defaults to |0>
+
+    ufreg1, ufreg2 = F(lambda i: ((x % N) ** i) % N, reg1, reg2)
+
+    mufreg1 = StochasticMeasure(ufreg1)
+
+    qft = QFFT(mufreg1)
+
+    # Measure Repeatedly
+    mqft = StochasticMeasure(qft)
+    mreg1 = StochasticMeasure(ufreg2)
+
+    return mqft, mufreg1, mreg1
 
 def quantum(a, N):
     # Find required number of bits
@@ -66,10 +89,19 @@ def quantum(a, N):
     o, c = Measure(qft).run(feed={reg1: reg1_init, reg2: reg2_init})
     return o, c
 
-o, c = quantum(5,9)
-
-print(c)
-print(o)
-
-n = int(numpy.log2(len(o)))
-
+mqft, mufrag1, mreg1 = make_circuit(8,4,11,15)
+o, c = run(mqft, mreg1)
+print(c[mqft])
+pyplot.plot(c[mreg1])
+pyplot.show()
+pyplot.plot(c[mufrag1])
+pyplot.show()
+pyplot.plot(c[mqft])
+pyplot.show()
+# o, c = quantum(5,9)
+#
+# print(c)
+# print(o)
+#
+# n = int(numpy.log2(len(o)))
+#
