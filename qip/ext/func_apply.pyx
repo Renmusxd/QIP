@@ -5,7 +5,6 @@ cimport util
 from util cimport *
 
 
-
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
@@ -38,6 +37,7 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
     cdef int x
     cdef int y
     cdef int r
+    cdef double complex tmp
     cdef int vec_zero_index
     cdef int vec_f_offset
     cdef int vec_r_offset
@@ -48,27 +48,33 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
     cdef int n_reg1 = reg1_indices.shape[0]
     cdef int n_reg2 = reg2_indices.shape[0]
 
-    for x in range(2**reg2_indices.shape[0]):
-        y = func(x)
+    with nogil:
+        for x in range(2**n_reg1):
+            with gil:
+                # Will only use last n_reg2 bytes.
+                y = func(x)
 
-        with nogil:
             # Make base index |x>|0>
             # We are assuming that |x>|y!=0> is 0 for all the input.
             vec_zero_index = 0
             for j in range(reg1_indices.shape[0]):
-                vec_zero_index = set_bit(vec_zero_index, (n-1) - reg1_indices[j],
+                vec_zero_index = set_bit(vec_zero_index,
+                                         (n-1) - reg1_indices[j],
                                          get_bit(x, (n_reg1-1) - j))
             # Make base index |x>|f(x)>
             vec_f_offset = 0
             for j in range(reg2_indices.shape[0]):
-                vec_f_offset = set_bit(vec_f_offset, (n-1) - reg2_indices[j],
-                                      get_bit(y, (n_reg2-1) - j))
+                vec_f_offset = set_bit(vec_f_offset,
+                                       (n-1) - reg2_indices[j],
+                                       get_bit(y, (n_reg2-1) - j))
 
             # Now can use to calculate offsets.
             # |x>|f(x)>|r> = |x>|0>|r> for all |r>
-            for r in range(2**n_remaining):
-                vec_r_offset = 0
-                for j in range(reg2_indices.shape[0]):
-                    vec_r_offset = set_bit(vec_r_offset, (n-1) - other_indices[j],
-                                           get_bit(r, (n_remaining-1) - j))
-                output[vec_zero_index | vec_f_offset | vec_r_offset] = vec[vec_zero_index | vec_r_offset]
+            if vec_f_offset != 0:
+                for r in range(2**other_indices.shape[0]):
+                    vec_r_offset = 0
+                    # TODO check this code.
+                    for j in range(reg2_indices.shape[0]):
+                        vec_r_offset = set_bit(vec_r_offset, (n-1) - other_indices[j],
+                                               get_bit(r, (n_remaining-1) - j))
+                    output[vec_zero_index | vec_f_offset | vec_r_offset] = vec[vec_zero_index | vec_r_offset]

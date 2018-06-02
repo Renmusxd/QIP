@@ -3,7 +3,7 @@ from qip.util import gen_edit_indices
 from qip.util import flatten
 
 
-def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, **kwargs):
+def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, strict=False, **kwargs):
     """
     Runs pipeline using all qubits in *args
     :param args: list of qubits to evaluate
@@ -21,10 +21,23 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, *
     frontier, graphnodes = get_deps(*args, feed=feed)
     for qubit in frontier:
         if qubit not in feed and qubit.default is not None:
-            feed[qubit] = qubit.default
+            if type(qubit.default) == int:
+                if 0 < qubit.default < 2**qubit.n:
+                    feed[qubit] = numpy.zeros((2**qubit.n,))
+                    feed[qubit][qubit.default] = 1.0
+                # if it's 0 then not defining it is faster
+            else:
+                feed[qubit] = qubit.default
 
     qbits = list(sorted(feed.keys(), key=lambda q: q.qid))
     frontier = list(sorted(frontier, key=lambda q: q.qid))
+
+    if strict:
+        missing_qubits = [qubit for qubit in frontier if qubit not in feed]
+        if len(missing_qubits):
+            raise ValueError("Missing Qubit states for: {}".format(missing_qubits))
+    # else:
+    #     undefined qubits default to |0>
 
     n = sum(q.n for q in frontier)
     if state is None:
@@ -37,8 +50,7 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, *
         state = numpy.zeros(2**n, dtype=numpy.complex128)
 
         # Set all the entries in state to product of matrix entries
-        state[0] = 1.0
-        for index, flips in gen_edit_indices([qbitindex[qbit] for qbit in qbits]):
+        for index, flips in gen_edit_indices([qbitindex[qbit] for qbit in qbits], n-1):
             state[index] = 1.0
             for qindex, flip in enumerate(flips):
                 qbit = qbits[qindex]
@@ -93,9 +105,6 @@ def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128, debug=
             print(node)
 
         state, arena, (n_bits, bits) = node.feed(state, qbitindex, n, arena)
-
-        tot = numpy.sum(numpy.power(numpy.abs(state),2))
-        print(node, tot)
 
         # Manage measurements
         qbitindex = node.remap_index(qbitindex, n)

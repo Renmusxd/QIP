@@ -37,6 +37,7 @@ def classical(N):
             print("Found a={}!".format(a))
             return a
 
+
 def make_circuit(m,n, x, N):
     """
     Make a quantum circuit with m,n qubits
@@ -46,11 +47,11 @@ def make_circuit(m,n, x, N):
     """
 
     # Instead of QFFT just initialize to (1/sqrt(2**m))|x>
-    default_state = numpy.ones((2 ** m,))*(numpy.power((2 ** m), -1.0 / 2.0))
+    default_state = numpy.ones((2 ** m,)) * pow((2 ** m), -1.0 / 2.0)
     reg1 = Qubit(n=m, default=default_state)  # Superposition of each |i>
     reg2 = Qubit(n=n)  # Will hold |f(i)>, defaults to |0>
 
-    ufreg1, ufreg2 = F(lambda i: ((x % N) ** i) % N, reg1, reg2)
+    ufreg1, ufreg2 = F(lambda i: pow(x, i, N), reg1, reg2)
 
     mufreg1 = StochasticMeasure(ufreg1)
 
@@ -68,26 +69,25 @@ def quantum(a, N):
     print(q)
     Q = 2**q
 
-    reg1 = Qubit(n=q)  # Will hold |x>
+    # Initial state is superposition of all |x> values.
+    reg1_init = numpy.ones((Q,)) * numpy.power(Q,-0.5)
+
+    reg1 = Qubit(n=q, default=reg1_init)  # Will hold |x>
     reg2 = Qubit(n=q)  # Will hold |f(x)>
 
-    ufreg1, ufreg2 = F(lambda x: (a%N)**x % N, reg1, reg2)
+    ufreg1, ufreg2 = F(lambda x: pow(a, x, N), reg1, reg2)
 
     qft = QFFT(ufreg1)
 
-    # Initial state is superposition of all |x> values.
-    reg1_init = numpy.ones((Q,)) * numpy.power(Q,-0.5)
-    reg2_init = numpy.zeros((Q,))
-    reg2_init[0] = 1.0
-
-    o_qfft, _ = qft.run(feed={reg1: reg1_init, reg2: reg2_init})
+    o_qfft, _ = qft.run()
 
     ps = measure_probabilities(numpy.array(list(range(0,q)), dtype=numpy.int32), 2*q, o_qfft)
     for s in gen_qubit_prints(ps, q):
         print(s)
 
-    o, c = Measure(qft).run(feed={reg1: reg1_init, reg2: reg2_init})
+    o, c = Measure(qft).run()
     return o, c
+
 
 mqft, mufrag1, mreg1 = make_circuit(8,4,11,15)
 o, c = run(mqft, mreg1)

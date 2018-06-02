@@ -103,12 +103,29 @@ class TestQubitMethods(unittest.TestCase):
         # Default value setup
         q1 = Qubit(n=1, default=[0.0, 1.0])
         q2 = Qubit(n=1)
-        o1, _ = run(q1, q2)
+        o1, _ = run(q1, q2, feed={q2: [1.0, 0.0]})
         # Feed setup
         q3 = Qubit(n=1)
         q4 = Qubit(n=1)
-        o2, _ = run(q3, q4, feed={q3: [0.0, 1.0]})
+        o2, _ = run(q3, q4, feed={q3: [0.0, 1.0], q4: [1.0, 0.0]})
         self.assertTrue(numpy.array_equal(o1, o2))
+
+    def test_default2(self):
+        n = 2
+        reg11 = Qubit(n=n, default=[1, 2, 3, 4])
+        reg21 = Qubit(n=n, default=[1, 0, 0, 0])
+        o1, _ = run(reg11, reg21)
+
+        reg12 = Qubit(n=n, default=[1, 2, 3, 4])
+        reg22 = Qubit(n=n)
+        o2, _ = run(reg12, reg22, feed={reg22: [1, 0, 0, 0]})
+
+        reg13 = Qubit(n=n)
+        reg23 = Qubit(n=n)
+        o3, _ = run(reg13, reg23, feed={reg13: [1, 2, 3, 4], reg23: [1, 0, 0, 0]})
+
+        self.assertTrue(numpy.array_equal(o1, o2))
+        self.assertTrue(numpy.array_equal(o1, o3))
 
     def test_cswap_compare(self):
         q1 = Qubit(n=1)
@@ -262,12 +279,30 @@ class TestQubitMethods(unittest.TestCase):
     def test_measure_stochastic(self):
         q1 = Qubit(n=2)
         q2 = Qubit(n=2)
-
         m1 = StochasticMeasure(q2)
-
         _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
                                  q2: [0.5, 0.5, 0.5, 0.5]})
         self.assertTrue(numpy.array_equal(c[m1], [0.25,0.25,0.25,0.25]))
+
+    def test_fop(self):
+        n = 2
+        reg1 = Qubit(n=n, default=[1, 2, 3, 4])
+        reg2 = Qubit(n=n, default=[1, 0, 0, 0])
+        freg1, freg2 = F(lambda x: 1, reg1, reg2)
+        o1, _ = run(freg1, freg2)
+
+        mock1 = Qubit(n=n, default=[1, 2, 3, 4])
+        mock2 = Qubit(n=n, default=[0.0, 1.0, 0, 0])
+        o2, _ = run(mock1, mock2)
+
+        self.assertTrue(numpy.array_equal(o1, o2))
+
+    def test_fop_regsize(self):
+        n = 2
+        reg1 = Qubit(n=2*n, default=numpy.ones(2**(2*n))*pow(2**(2*n),-0.5))
+        reg2 = Qubit(n=n)
+        freg1, freg2 = F(lambda x: pow(3,x,2**n), reg1, reg2)
+        o1, _ = run(freg1, freg2)
 
 
 if __name__ == '__main__':

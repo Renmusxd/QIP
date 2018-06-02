@@ -86,10 +86,10 @@ def gen_valid_col_and_matcol(row, matindices, n):
         yield (row, bitarray_to_uint(colbits)), {matindices[j]: item for j, item in enumerate(zip(matrow, matcol))}
 
 
-def gen_edit_indices(index_groups):
+def gen_edit_indices(index_groups, maxindex):
     if len(index_groups) > 0:
         allindices = flatten(index_groups)
-        maxindex = max(allindices)
+        #maxindex = max(allindices)
 
         bits = [0] * (maxindex+1)
         for i in range(2**len(allindices)):

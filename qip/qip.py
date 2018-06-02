@@ -76,6 +76,8 @@ class Qubit(PipelineObject):
         super().__init__(quantum, default=default)
         if n is None:
             n = sum(q.n for q in inputs)
+        if type(default)==list and len(default) != 2**n:
+            raise ValueError("Default state length must be 2**n")
         self.n = n
         self.check()
         if qid is None:
