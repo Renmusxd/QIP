@@ -64,14 +64,14 @@ def make_circuit(m,n, x, N):
     return mqft, mreg2
 
 
-mqft, mreg2 = make_circuit(9,9,11,15)
+mqft, mreg2 = make_circuit(9,4,11,21)
 
 printCircuit(mqft, mreg2)
 
 
 o, c = run(mqft, mreg2)
-print(c[mreg2])
-print(c[mqft])
+# print(c[mreg2])
+# print(c[mqft])
 pyplot.plot(c[mreg2])
 pyplot.show()
 pyplot.plot(c[mqft])
