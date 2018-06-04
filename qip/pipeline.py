@@ -47,7 +47,10 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, s
             qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
             n += qbit.n
 
-        state = numpy.zeros(2**n, dtype=numpy.complex128)
+        state = numpy.zeros(2**n, dtype=statetype)
+
+        if len(qbits) == 0:
+            state[0] = 1
 
         # Set all the entries in state to product of matrix entries
         for index, flips in gen_edit_indices([qbitindex[qbit] for qbit in qbits], n-1):
@@ -55,6 +58,10 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, s
             for qindex, flip in enumerate(flips):
                 qbit = qbits[qindex]
                 state[index] = state[index] * feed[qbit][flip]
+    elif type(state) == int:
+        stateint = state
+        state = numpy.zeros(2**n, dtype=statetype)
+        state[stateint] = 1.0
     elif len(state) != 2**n:
         raise ValueError("State size must be 2**n")
     elif type(state) == list:
@@ -99,7 +106,8 @@ def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128, debug=
     classic_map = {}
 
     while len(frontier) > 0:
-        node = frontier.pop()
+        frontier = list(sorted(frontier, key=lambda q: q.qid))
+        node, frontier = frontier[0], frontier[1:]
 
         if debug:
             print(node)
@@ -116,7 +124,7 @@ def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128, debug=
         seen.add(node)
         # Iterate sink for special cases where "cloning" takes place (i.e. splitting qubits after operation)
         for nextnode in node.sink:
-            if nextnode in graphnodes and nextnode not in seen:
+            if nextnode in graphnodes and nextnode not in seen and nextnode not in frontier:
                 all_deps = True
                 for prevnode in nextnode.inputs:
                     if prevnode not in seen:
@@ -126,3 +134,98 @@ def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128, debug=
                     frontier.append(nextnode)
                     qbitindex[nextnode] = nextnode.select_index(flatten(qbitindex[j] for j in nextnode.inputs))
     return state, classic_map
+
+
+def make_circuit_mat(*args):
+    """
+    Gives matrix for quantum part of circuit, ignores measurements.
+    :param args: outputs (like run(...))
+    :return: matrix.
+    """
+    # First do 0 state to get n
+    o, _ = run(*args)  # Pretend classic measurement doesn't exist
+    n = int(numpy.log2(len(o)))
+
+    mat = numpy.zeros((2**n, 2**n), dtype=numpy.complex128)
+    mat[:,0] = o
+    for i in range(1,2**n):
+        o, _ = run(*args, state=i)
+        mat[:,i] = o
+    return mat
+
+blacklist = ["SplitQubit", "Q"]
+def printCircuit(*args, opwidth=1, linespacing=1, outputfn=print):
+    """
+    Print out circuit which leads to qubits in args
+    :param args: list of qubits (same as would be passed to run(*args)
+    """
+    frontier, graphnodes = get_deps(*args)
+    frontier = list(sorted(frontier, key=lambda q: q.qid))
+
+    qbitindex = {}
+    seen = set()
+    n = 0
+    for qbit in frontier:
+        qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
+        n += qbit.n
+
+    qubit_line = (" "*opwidth) + "|" + (" "*opwidth)
+    while len(frontier) > 0:
+        frontier = list(sorted(frontier, key=lambda q: q.qid))
+        node, frontier = frontier[0], frontier[1:]
+
+        indices = flatten([qbitindex[qubit] for qubit in node.inputs])
+        if len(indices) > 0:
+            nodestr = repr(node)
+            paren_pos = nodestr.find('(')
+            if paren_pos > 0:
+                nodestr = nodestr[:paren_pos]
+
+            if nodestr not in blacklist:
+                # print node at relevant positions
+                default_line = [qubit_line] * n
+
+                outputfn((" " * linespacing).join(default_line))
+
+                for index in indices:
+                    default_line[index] = "-"*(2*opwidth + 1)
+                outputfn((" "*linespacing).join(default_line))
+
+                for nodechr in nodestr:
+                    default_line = [qubit_line]*n
+                    for index in indices:
+                        default_line[index] = "|" + (" "*(opwidth-1)) + nodechr + (" "*(opwidth-1)) + "|"
+                    outputfn((" " * linespacing).join(default_line))
+
+                max_len = max(len(str(i)) for i in range(len(indices)))
+                index_strs = []
+                for i in range(len(indices)):
+                    index_str = str(i)
+                    difflen = max_len - len(index_str)
+                    if difflen > 0:
+                        index_str = " "*difflen + index_str
+                    index_strs.append(index_str)
+                for l in range(max_len):
+                    for i,index in enumerate(indices):
+                        default_line[index] = "|" + (" " * (opwidth - 1)) + index_strs[i][l] + (" " * (opwidth - 1)) + "|"
+                    outputfn((" " * linespacing).join(default_line))
+
+                for index in indices:
+                    default_line[index] = "-"*(2*opwidth + 1)
+                outputfn((" "*linespacing).join(default_line))
+
+        # Manage measurements
+        qbitindex = node.remap_index(qbitindex, n)
+        seen.add(node)
+
+        # Iterate sink for special cases where "cloning" takes place (i.e. splitting qubits after operation)
+        for nextnode in node.sink:
+            if nextnode in graphnodes and nextnode not in seen and nextnode not in frontier:
+                all_deps = True
+                for prevnode in nextnode.inputs:
+                    if prevnode not in seen:
+                        all_deps = False
+                        break
+                if all_deps:
+                    frontier.append(nextnode)
+                    qbitindex[nextnode] = nextnode.select_index(flatten(qbitindex[j] for j in nextnode.inputs))

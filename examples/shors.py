@@ -1,9 +1,9 @@
 from qip.qip import *
 from qip.operators import *
 from qip.util import gen_qubit_prints
-from qip.qfft import QFFT
+from qip.qfft import *
 from qip.ext.kronprod import measure_probabilities
-from qip.pipeline import run
+from qip.pipeline import *
 import numpy
 import math
 import random
@@ -53,55 +53,26 @@ def make_circuit(m,n, x, N):
 
     ufreg1, ufreg2 = F(lambda i: pow(x, i, N), reg1, reg2)
 
-    mufreg1 = StochasticMeasure(ufreg1)
-
-    qft = QFFT(mufreg1)
-
-    # Measure Repeatedly
-    mqft = StochasticMeasure(qft)
-    mreg1 = StochasticMeasure(ufreg2)
-
-    return mqft, mufreg1, mreg1
-
-def quantum(a, N):
-    # Find required number of bits
-    q = int(numpy.ceil(numpy.log2(N**2)))
-    print(q)
-    Q = 2**q
-
-    # Initial state is superposition of all |x> values.
-    reg1_init = numpy.ones((Q,)) * numpy.power(Q,-0.5)
-
-    reg1 = Qubit(n=q, default=reg1_init)  # Will hold |x>
-    reg2 = Qubit(n=q)  # Will hold |f(x)>
-
-    ufreg1, ufreg2 = F(lambda x: pow(a, x, N), reg1, reg2)
-
     qft = QFFT(ufreg1)
 
-    o_qfft, _ = qft.run()
+    out1, out2 = Qubit(qft, ufreg2).split()
 
-    ps = measure_probabilities(numpy.array(list(range(0,q)), dtype=numpy.int32), 2*q, o_qfft)
-    for s in gen_qubit_prints(ps, q):
-        print(s)
+    # Measure Repeatedly
+    mqft = StochasticMeasure(out1)
+    mreg2 = StochasticMeasure(out2)
 
-    o, c = Measure(qft).run()
-    return o, c
+    return mqft, mreg2
 
 
-mqft, mufrag1, mreg1 = make_circuit(8,4,11,15)
-o, c = run(mqft, mreg1)
+mqft, mreg2 = make_circuit(9,9,11,15)
+
+printCircuit(mqft, mreg2)
+
+
+o, c = run(mqft, mreg2)
+print(c[mreg2])
 print(c[mqft])
-pyplot.plot(c[mreg1])
-pyplot.show()
-pyplot.plot(c[mufrag1])
+pyplot.plot(c[mreg2])
 pyplot.show()
 pyplot.plot(c[mqft])
 pyplot.show()
-# o, c = quantum(5,9)
-#
-# print(c)
-# print(o)
-#
-# n = int(numpy.log2(len(o)))
-#

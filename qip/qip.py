@@ -58,6 +58,9 @@ class PipelineObject(object):
     def apply(self, op):
         return op(self)
 
+    def __hash__(self):
+        return hash(repr(self))
+
 
 class Qubit(PipelineObject):
     """QIDs are used to ensure the no-cloning theorem holds.
@@ -149,6 +152,9 @@ class SplitQubit(Qubit):
     def select_index(self, indices):
         return [indices[i] for i in self.indices]
 
+    def __repr__(self):
+        return "SplitQubit({})".format(",".join(map(repr,self.inputs)))
+
 
 class Measure(PipelineObject):
     """Measures some quantum input."""
@@ -237,9 +243,9 @@ class StochasticMeasure(Qubit):
         """
         # Get indices and make measurement
         indices = numpy.array(flatten(qbitindex[q] for q in self.inputs), dtype=numpy.int32)
-        probs = measure_probabilities(indices, n, inputvals)
+        probs = measure_probabilities(indices, n, inputvals).copy()
 
         return inputvals, arena, (0, probs)
 
     def __repr__(self):
-        return "M({})".format(",".join(i.__repr__() for i in self.inputs))
+        return "SM({})".format(",".join(i.__repr__() for i in self.inputs))

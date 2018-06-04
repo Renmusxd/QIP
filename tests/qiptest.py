@@ -10,19 +10,37 @@ class TestQubitMethods(unittest.TestCase):
         q = Qubit(n=1)
         n = Not(q)
         o, _ = n.run(feed={q: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [0., 1.]))
+        self.assertTrue(numpy.allclose(o, [0., 1.]))
 
     def test_simple_pipeline_inv(self):
         q = Qubit(n=1)
         n = Not(q)
         o, _ = n.run(feed={q: [0.0, 1.0]})
-        self.assertTrue(numpy.array_equal(o, [1., 0.]))
+        self.assertTrue(numpy.allclose(o, [1., 0.]))
 
     def test_bell(self):
         q = Qubit(n=1)
         h = H(q)
         o, _ = h.run(feed={q: [1.0, 0.0]})
         self.assertEqual(o[0], o[1])
+
+    def test_h_first(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=1)
+        h1 = H(q1)
+        h2 = H(q2)
+        q3, q4 = Qubit(h1, h2).split()
+        h3 = H(q3)
+        o1, _ = h3.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
+
+        # Should give same as H on just second qubit
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=1)
+        h3 = H(q2)
+        q3, q4 = Qubit(q1, h3).split()
+        o2, _ = q3.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
+
+        self.assertTrue(numpy.allclose(o1, o2))
 
     def test_bell_inv(self):
         q = Qubit(n=1)
@@ -35,23 +53,23 @@ class TestQubitMethods(unittest.TestCase):
         q2 = Qubit(n=1)
         s = NotOp(q1,q2)
         o, _ = s.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 0.0, 1.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 0.0, 0.0, 1.0]))
 
     def test_swap(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
         s = SwapOp(q1,q2)
         o, _ = s.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [1.0, 0.0, 0.0, 0.0]))
 
         o, _ = s.run(feed={q1: [1.0, 0.0], q2: [0.0, 1.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 1.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 0.0, 1.0, 0.0]))
 
         o, _ = s.run(feed={q1: [0.0, 1.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 1.0, 0.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 1.0, 0.0, 0.0]))
 
         o, _ = s.run(feed={q1: [0.0, 1.0], q2: [0.0, 1.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 0.0, 1.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 0.0, 0.0, 1.0]))
 
     def test_swap_twobit(self):
         q1 = Qubit(n=2)
@@ -69,15 +87,15 @@ class TestQubitMethods(unittest.TestCase):
         f2 = Not(n2)
         # f1 should be back to q1 whereas n2 should be negated.
         o, _ = f1.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 1.0, 0.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 1.0, 0.0, 0.0]))
 
         # Vice versa
         o, _ = f2.run(feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 1.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 0.0, 1.0, 0.0]))
 
         # Now both back to normal
         o, _ = run(f1, f2, feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [1.0, 0.0, 0.0, 0.0]))
 
     def test_allsplit(self):
         n = 5
@@ -88,16 +106,16 @@ class TestQubitMethods(unittest.TestCase):
 
         state = numpy.cos(numpy.linspace(0,numpy.pi,2**n))
         o, _ = run(newq, feed={q: state})
-        self.assertTrue(numpy.array_equal(state, o))
+        self.assertTrue(numpy.allclose(state, o))
 
     def test_cnot(self):
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
         c1, c2 = C(Not)(q1, q2)
         o, _ = run(c1, c2, feed={q1: [1.0, 0.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [1.0, 0.0, 0.0, 0.0]))
+        self.assertTrue(numpy.allclose(o, [1.0, 0.0, 0.0, 0.0]))
         o,_ = run(c1, c2, feed={q1: [0.0, 1.0], q2: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o, [0.0, 0.0, 0.0, 1.0]))
+        self.assertTrue(numpy.allclose(o, [0.0, 0.0, 0.0, 1.0]))
 
     def test_default(self):
         # Default value setup
@@ -108,7 +126,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=1)
         q4 = Qubit(n=1)
         o2, _ = run(q3, q4, feed={q3: [0.0, 1.0], q4: [1.0, 0.0]})
-        self.assertTrue(numpy.array_equal(o1, o2))
+        self.assertTrue(numpy.allclose(o1, o2))
 
     def test_default2(self):
         n = 2
@@ -124,8 +142,8 @@ class TestQubitMethods(unittest.TestCase):
         reg23 = Qubit(n=n)
         o3, _ = run(reg13, reg23, feed={reg13: [1, 2, 3, 4], reg23: [1, 0, 0, 0]})
 
-        self.assertTrue(numpy.array_equal(o1, o2))
-        self.assertTrue(numpy.array_equal(o1, o3))
+        self.assertTrue(numpy.allclose(o1, o2))
+        self.assertTrue(numpy.allclose(o1, o3))
 
     def test_cswap_compare(self):
         q1 = Qubit(n=1)
@@ -239,7 +257,7 @@ class TestQubitMethods(unittest.TestCase):
                                  q3: [1.0, 0.0, 0.0, 0.0,
                                       0.0, 0.0, 0.0, 0.0]})
 
-        self.assertTrue(numpy.array_equal(o1, o2))
+        self.assertTrue(numpy.allclose(o1, o2))
 
     def test_cswap_measure(self):
         q1 = Qubit(n=1)
@@ -282,7 +300,7 @@ class TestQubitMethods(unittest.TestCase):
         m1 = StochasticMeasure(q2)
         _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
                                  q2: [0.5, 0.5, 0.5, 0.5]})
-        self.assertTrue(numpy.array_equal(c[m1], [0.25,0.25,0.25,0.25]))
+        self.assertTrue(numpy.allclose(c[m1], [0.25,0.25,0.25,0.25]))
 
     def test_fop(self):
         n = 2
@@ -295,14 +313,28 @@ class TestQubitMethods(unittest.TestCase):
         mock2 = Qubit(n=n, default=[0.0, 1.0, 0, 0])
         o2, _ = run(mock1, mock2)
 
-        self.assertTrue(numpy.array_equal(o1, o2))
+        self.assertTrue(numpy.allclose(o1, o2))
 
     def test_fop_regsize(self):
         n = 2
         reg1 = Qubit(n=2*n, default=numpy.ones(2**(2*n))*pow(2**(2*n),-0.5))
         reg2 = Qubit(n=n)
-        freg1, freg2 = F(lambda x: pow(3,x,2**n), reg1, reg2)
+        freg1, freg2 = F(lambda x: pow(3, x, 2**n), reg1, reg2)
         o1, _ = run(freg1, freg2)
+
+    def test_basic_rop(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=1)
+        r2 = Rm(2, q2)
+        o, _ = run(q1, r2)
+        self.assertTrue(numpy.allclose(numpy.abs(o), [1, 0, 0, 0]))
+
+    def test_rop(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=1, default=1)
+        r2 = Rm(2, q2)
+        o, _ = run(q1, r2)
+        self.assertTrue(numpy.allclose(numpy.abs(o), [0, 1.0, 0, 0]))
 
 
 if __name__ == '__main__':

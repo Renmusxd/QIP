@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy
 import collections
 import qip.ext.kronprod as kronprod
@@ -67,7 +69,7 @@ def dot_loop(mats, vec, n, output):
                 submati = bitarray_to_uint([mijs[index][0] for index in indices])
                 submatj = bitarray_to_uint([mijs[index][1] for index in indices])
 
-                print(tuple([row, c, submati, submatj, mat[submati, submatj]]))
+                # print(tuple([row, c, submati, submatj, mat[submati, submatj]]))
                 p *= mat[submati, submatj]
             s += p*vec[c]
         output[row] = s
@@ -107,13 +109,13 @@ def gen_edit_indices(index_groups, maxindex):
 
 
 def expand_kron_matrix(mats, n, cmode=False):
-    m = numpy.zeros((2**n, 2**n))
+    m = numpy.zeros((2**n, 2**n), dtype=numpy.complex128)
+    mats = {i: numpy.array(mats[i], dtype=numpy.complex128) for i in mats}
     for i in range(2**n):
-        v = numpy.zeros((2**n,))
+        v = numpy.zeros((2**n,), dtype=numpy.complex128)
         v[i] = 1.0
         kronselect_dot(mats, v, n, m[i, :], cmode=cmode)
     return m
-
 
 def uint_to_bitarray(num, n):
     bits = []
@@ -130,8 +132,8 @@ def bitarray_to_uint(bits):
     return s
 
 
-def flatten(list):
-    listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in list]
+def flatten(lst):
+    listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in lst]
     return [item for sublist in listgen for item in sublist]
 
 

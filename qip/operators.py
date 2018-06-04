@@ -84,13 +84,31 @@ class ROp(MatrixOp):
         return {i: numpy.array([[1, 0], [0, self.exponented]])
                 for i in flatten([qbitindex[inp] for inp in self.inputs])}
 
+    def __repr__(self):
+        return "R({})".format(",".join(map(repr,self.inputs)))
+
+
+def Rm(m, *inputs, negate=False, **kwargs):
+    r = RmOp(m, *inputs, negate=negate, **kwargs)
+    if len(inputs) > 1:
+        return r.split()
+    return r
+
+
+class RmOp(ROp):
+    def __init__(self, m, *inputs, negate=False, **kwargs):
+        super().__init__( (-2 if negate else 2) * numpy.pi / pow(2.0,m), *inputs, **kwargs)
+        self.m = m
+
+    def __repr__(self):
+        return "R[{}]({})".format(self.m, ",".join(map(repr,self.inputs)))
+
 
 def Swap(*inputs, **kwargs):
     s = SwapOp(*inputs, **kwargs)
     if len(inputs) > 1:
         return s.split()
     return s
-
 
 class SwapOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
@@ -156,6 +174,8 @@ class COp(MatrixOp):
             raise ValueError("Not enough input values given.")
         if inputs[0].n != 1:
             raise ValueError("Control bit can only be of size n=1")
+        if len(set(inputs)) < len(inputs):
+            raise ValueError("Cannot have repeated qubits in COp")
         self.op = op(*inputs[1:], nosink=True, **kwargs)
         super().__init__(*inputs, qid=self.op.qid, **kwargs)
 
