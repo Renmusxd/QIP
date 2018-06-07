@@ -47,7 +47,7 @@ class PipelineObject(object):
         return index_map
 
     def set_sink(self, sink):
-        if len(self.sink) == 0 or self.sink[0].qid == sink.qid:
+        if type(sink) != Qubit or (len(self.sink) == 0 or self.sink[0].qid == sink.qid):
             self.sink += [sink]
         else:
             raise Exception("Qubits may only sink to one output (no cloning)")
@@ -156,11 +156,11 @@ class SplitQubit(Qubit):
         return "SplitQubit({})".format(",".join(map(repr,self.inputs)))
 
 
-class Measure(PipelineObject):
+class Measure(Qubit):
     """Measures some quantum input."""
 
     def __init__(self, *inputs, measure_by=None, nosink=False):
-        super().__init__(False)
+        super().__init__(*inputs, nosink=nosink)
         self.inputs = inputs
         self.n = sum(q.n for q in self.inputs)
         self.measure = measure_by

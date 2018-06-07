@@ -11,31 +11,45 @@ from matplotlib import pyplot
 
 
 MAX_QUBITS = 28
-MAXN = numpy.ceil(numpy.power(2**(MAX_QUBITS - 2), 0.25))
 
 
 def classical(N):
-    if N > MAXN:
+    if 2*numpy.log2(N) > MAX_QUBITS:
         raise ValueError("N above MAXN")
 
     while True:
-        a = random.randint(2,N)
+        a = random.randint(2,N-1)
         print("Trying a={}...".format(a))
         gcd = math.gcd(a, N)
         if gcd != 1:
+            print("gcd={}".format(gcd))
             return a
         r = quantum(a, N)
         print("\tQuantum part found r={}...".format(r))
         if r % 2 == 1:
             print("\tR is odd.")
             continue
-        apow = a**(r/2)
-        if apow % N == 1:
+        apow = a**int(r/2)
+        if pow(a, int(r/2), 2) == 1:
             print("\ta^{r/2} % N is odd...")
             continue
         if math.gcd(apow + 1, N) != 1 and math.gcd(apow - 1, N):
             print("Found a={}!".format(a))
             return a
+
+
+def quantum(x, N):
+    n_qubits = int(numpy.ceil(numpy.log2(N)))
+    m_qubits = int(numpy.ceil(numpy.log2(x)))
+
+    r = 0
+    while r == 0:
+        stochastic_output, m = make_circuit(m_qubits, n_qubits,
+                                            x, N)
+        o, c = run(m)
+        r = c[m][0]
+        print("\tr={}".format(r))
+    return r
 
 
 def make_circuit(m,n, x, N):
@@ -59,20 +73,17 @@ def make_circuit(m,n, x, N):
 
     # Measure Repeatedly
     mqft = StochasticMeasure(out1)
-    mreg2 = StochasticMeasure(out2)
+    m = Measure(qft)
 
-    return mqft, mreg2
+    return mqft, m
 
+classical(21)
 
-mqft, mreg2 = make_circuit(9,4,11,21)
-
-printCircuit(mqft, mreg2)
-
-
-o, c = run(mqft, mreg2)
-# print(c[mreg2])
-# print(c[mqft])
-pyplot.plot(c[mreg2])
-pyplot.show()
-pyplot.plot(c[mqft])
-pyplot.show()
+#
+# mqft, m = make_circuit(9,4,11,21)
+#
+# printCircuit(mqft)
+#
+# o, c = run(mqft, m)
+# pyplot.plot(c[mqft])
+# pyplot.show()
