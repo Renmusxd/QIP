@@ -3,12 +3,13 @@ from qip.util import gen_edit_indices
 from qip.util import flatten
 
 
-def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, strict=False, **kwargs):
+def run(*args, state=None, feed=None, statetype=numpy.complex128, strict=False, **kwargs):
     """
     Runs pipeline using all qubits in *args. Produces an output state based on input.
     :param args: list of qubits to evaluate
     :param state: full state of n qbits
     :param feed: feed of individual qbit states
+    :param statetype: type of state data (should be complex numpy value).
     :return: state of full qubit system (2**n array)
     """
     if feed is None:
@@ -67,7 +68,7 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, debug=False, s
     elif type(state) == list:
         state = numpy.array(state)
 
-    return feed_forward(frontier, state, graphnodes, debug=debug, statetype=statetype)
+    return feed_forward(frontier, state, graphnodes, statetype=statetype)
 
 
 def get_deps(*args, feed=None):
@@ -169,15 +170,16 @@ class NodeFeeder:
             self.n -= n_bits
 
 
-def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128, debug=False):
+def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128):
     n = sum(f.n for f in frontier)
     graphacc = NodeFeeder(state, n, statetype)
     run_graph(frontier, graphnodes, graphacc)
     return graphacc.state, graphacc.classic_map
 
 
-blacklist = ["SplitQubit", "Q"]
 class PrintFeeder:
+    BLACKLIST = ["SplitQubit", "Q"]
+
     def __init__(self, n, opwidth=1, linespacing=1, outputfn=print):
         self.opwidth = opwidth
         self.linespacing = linespacing
@@ -193,7 +195,7 @@ class PrintFeeder:
             if paren_pos > 0:
                 nodestr = nodestr[:paren_pos]
 
-            if nodestr not in blacklist:
+            if nodestr not in PrintFeeder.BLACKLIST:
                 # print node at relevant positions
                 default_line = [self.qubit_line] * self.n
 
@@ -206,7 +208,8 @@ class PrintFeeder:
                 for nodechr in nodestr:
                     default_line = [self.qubit_line] * self.n
                     for index in indices:
-                        default_line[index] = "|" + (" " * (self.opwidth - 1)) + nodechr + (" " * (self.opwidth - 1)) + "|"
+                        default_line[index] = "|" + (" " * (self.opwidth - 1)) +\
+                                              nodechr + (" " * (self.opwidth - 1)) + "|"
                     self.outputfn((" " * self.linespacing).join(default_line))
 
                 max_len = max(len(str(i)) for i in range(len(indices)))

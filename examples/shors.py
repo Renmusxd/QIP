@@ -9,7 +9,6 @@ import math
 import random
 from matplotlib import pyplot
 
-
 MAX_QUBITS = 28
 
 
@@ -18,36 +17,47 @@ def classical(N):
         raise ValueError("N above MAXN")
 
     while True:
+        print("Step 1: pick a < N={}".format(N))
         a = random.randint(2,N-1)
-        print("Trying a={}...".format(a))
+        print("\ta={}...".format(a))
+
+        print("Step 2: compute gcd(a,N)")
         gcd = math.gcd(a, N)
+        print("\tgcd({},{})={}".format(a,N,gcd))
         if gcd != 1:
-            print("gcd={}".format(gcd))
+            print("gcd != 1 --> Factor found!")
             return a
+        print("Step 3: Find period r")
         r = quantum(a, N)
-        print("\tQuantum part found r={}...".format(r))
+        print("\tr={}".format(r))
         if r % 2 == 1:
-            print("\tR is odd.")
+            print("\tr is odd, returning to step 1.")
             continue
-        apow = a**int(r/2)
-        if pow(a, int(r/2), 2) == 1:
-            print("\ta^{r/2} % N is odd...")
+        apow = pow(a,int(r/2), N)
+        if apow == N - 1:
+            print("\ta^{r/2} % N === -1, returning to step 1.")
             continue
-        if math.gcd(apow + 1, N) != 1 and math.gcd(apow - 1, N):
-            print("Found a={}!".format(a))
-            return a
+
+        factors = (math.gcd(apow+1,N), math.gcd(apow-1,N))
+        return factors[0]
 
 
 def quantum(x, N):
     n_qubits = int(numpy.ceil(numpy.log2(N)))
     m_qubits = int(numpy.ceil(numpy.log2(x)))
 
-    r = 0
-    while r == 0:
+    r = 1
+    while r == 1:
         stochastic_output, m = make_circuit(m_qubits, n_qubits,
                                             x, N)
         o, c = run(m)
-        r = c[m][0]
+        x = c[m][0]
+        if x==0:
+            continue
+
+        print("\tx={}".format(x))
+        r = math.gcd(x,N)
+
         print("\tr={}".format(r))
     return r
 
@@ -78,7 +88,7 @@ def make_circuit(m,n, x, N):
     return mqft, m
 
 classical(21)
-
+#
 #
 # mqft, m = make_circuit(9,4,11,21)
 #
@@ -87,3 +97,8 @@ classical(21)
 # o, c = run(mqft, m)
 # pyplot.plot(c[mqft])
 # pyplot.show()
+#
+# top_ten = list(reversed(c[mqft].argsort()[-10:]))
+#
+# print(top_ten)
+# print(c[mqft][top_ten])
