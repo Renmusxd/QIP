@@ -113,6 +113,11 @@ def make_circuit_mat(*args):
     return mat
 
 
+class GraphAccumulator:
+    def feed(self, qbitindex, node):
+        raise NotImplemented("Method not implemented.")
+
+
 def run_graph(frontier, graphnodes, graphacc):
     """
     Apply the feed function from graphacc to each node in the graph in the order necessary to run the circuit.
@@ -152,7 +157,7 @@ def run_graph(frontier, graphnodes, graphacc):
                     qbitindex[nextnode] = nextnode.select_index(flatten(qbitindex[j] for j in nextnode.inputs))
 
 
-class NodeFeeder:
+class NodeFeeder(GraphAccumulator):
     def __init__(self, state, n, statetype=numpy.complex128):
         self.state = state.astype(statetype)
         self.arena = numpy.ndarray(shape=(2 ** n,), dtype=statetype)
@@ -177,7 +182,7 @@ def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128):
     return graphacc.state, graphacc.classic_map
 
 
-class PrintFeeder:
+class PrintFeeder(GraphAccumulator):
     BLACKLIST = ["SplitQubit", "Q"]
 
     def __init__(self, n, opwidth=1, linespacing=1, outputfn=print):

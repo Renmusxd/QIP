@@ -4,6 +4,7 @@ from qip.util import gen_qubit_prints
 from qip.qfft import *
 from qip.ext.kronprod import measure_probabilities
 from qip.pipeline import *
+from qip.svgwriter import make_svg
 import numpy
 import math
 import random
@@ -55,10 +56,9 @@ def quantum(x, N):
         if x==0:
             continue
 
-        print("\tx={}".format(x))
         r = math.gcd(x,N)
 
-        print("\tr={}".format(r))
+        print("\tx={} \tr={}".format(x,r))
     return r
 
 
@@ -87,18 +87,21 @@ def make_circuit(m,n, x, N):
 
     return mqft, m
 
-classical(21)
-#
-#
-# mqft, m = make_circuit(9,4,11,21)
-#
-# printCircuit(mqft)
-#
-# o, c = run(mqft, m)
-# pyplot.plot(c[mqft])
-# pyplot.show()
-#
-# top_ten = list(reversed(c[mqft].argsort()[-10:]))
-#
-# print(top_ten)
-# print(c[mqft][top_ten])
+# classical(21)
+
+
+mqft, m = make_circuit(9,4,11,21)
+
+printCircuit(mqft)
+
+o, c = run(mqft, m)
+pyplot.plot(c[mqft])
+pyplot.show()
+
+top_ten = list(reversed(c[mqft].argsort()[-10:]))
+
+print(top_ten)
+print(c[mqft][top_ten])
+
+with open("shors.svg", "w") as w:
+    w.write(make_svg(mqft))

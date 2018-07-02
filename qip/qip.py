@@ -1,7 +1,7 @@
-from .pipeline import run
-import numpy
+from qip.pipeline import run
 from qip.ext.kronprod import measure, measure_probabilities
 from qip.util import flatten
+import numpy
 
 
 class PipelineObject(object):
