@@ -1,7 +1,6 @@
 from qip.pipeline import run_graph, get_deps
 from qip.pipeline import GraphAccumulator
-from qip.operators import SwapOp
-from qip.operators import COp
+from qip.operators import SwapOp, COp, NotOp
 
 
 class SvgFeeder(GraphAccumulator):
@@ -68,6 +67,24 @@ class SvgFeeder(GraphAccumulator):
             )
 
             s += self.get_op_string({node.op: qbitindex[node][1:]}, node.op, x)
+        elif type(node) == NotOp:
+            for node_index in node_indices:
+                center_y = node_index * self.linespacing + self.opheight
+                s += '<circle cx="{}" cy="{}" r="{}" stroke="black" stroke-width="1" fill="white" />'.format(
+                    x, center_y, self.opheight / 2
+                )
+                s += '<line x1="{}" x2="{}" y1="{}" y2="{}" style="stroke:black;stroke-width:{}"></line>\n'.format(
+                    x, x,
+                    center_y - self.opheight/2,
+                    center_y + self.opheight/2,
+                    self.linewidth/2
+                )
+                s += '<line x1="{}" x2="{}" y1="{}" y2="{}" style="stroke:black;stroke-width:{}"></line>\n'.format(
+                    x - self.opheight / 2,
+                    x + self.opheight / 2,
+                    center_y, center_y,
+                    self.linewidth/2
+                )
         else:
             op_name = self.trim_op_name(node)
             for node_index in node_indices:
@@ -133,12 +150,11 @@ class SvgFeeder(GraphAccumulator):
         )
         return tmp
 
+
 def make_svg(*args):
     frontier, graphnodes = get_deps(*args)
-    print(frontier)
     frontier = list(sorted(frontier, key=lambda q: q.qid))
     n = sum(f.n for f in frontier)
     graphacc = SvgFeeder(n)
     run_graph(frontier, graphnodes, graphacc)
-
     return graphacc.get_svg_text()
