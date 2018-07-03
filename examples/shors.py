@@ -1,14 +1,10 @@
 from qip.qip import *
 from qip.operators import *
-from qip.util import gen_qubit_prints
 from qip.qfft import *
-from qip.ext.kronprod import measure_probabilities
 from qip.pipeline import *
-from qip.svgwriter import make_svg
 import numpy
 import math
 import random
-from matplotlib import pyplot
 
 MAX_QUBITS = 28
 
@@ -20,7 +16,6 @@ def classical(N):
     while True:
         print("Step 1: pick a < N={}".format(N))
         a = random.randint(2,N-1)
-        a = 11
         print("\ta={}...".format(a))
 
         print("Step 2: compute gcd(a,N)")
@@ -125,4 +120,6 @@ def make_circuit(m,n, x, N):
 
     return mqft, m
 
-print("Factors: {}".format(classical(21)))
+
+factors = classical(21)
+print("Factors: {}".format(factors))
