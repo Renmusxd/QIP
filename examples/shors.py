@@ -20,6 +20,7 @@ def classical(N):
     while True:
         print("Step 1: pick a < N={}".format(N))
         a = random.randint(2,N-1)
+        a = 11
         print("\ta={}...".format(a))
 
         print("Step 2: compute gcd(a,N)")
@@ -40,26 +41,63 @@ def classical(N):
             continue
 
         factors = (math.gcd(apow+1,N), math.gcd(apow-1,N))
-        return factors[0]
+        if factors[0] == 1 or factors[1] == 1:
+            continue
+        return factors
 
 
 def quantum(x, N):
+    q_qubits = int(numpy.ceil(numpy.log2(N**2)))
+    q = pow(2, q_qubits)
     n_qubits = int(numpy.ceil(numpy.log2(N)))
-    m_qubits = int(numpy.ceil(numpy.log2(x)))
+    # m_qubits = int(numpy.ceil(numpy.log2(x)))
 
     r = 1
     while r == 1:
-        stochastic_output, m = make_circuit(m_qubits, n_qubits,
-                                            x, N)
+        stochastic_output, m = make_circuit(q_qubits, n_qubits, x, N)
         o, c = run(m)
-        x = c[m][0]
-        if x==0:
+        peak = c[m][0]
+        if peak == 0:
             continue
 
-        r = math.gcd(x,N)
+        # (peak / q) ~= (d/r)
+        print("\tmeasured peak: {}".format(peak))
+        for d, r in reversed(list(gen_continued_fractions(peak, q))):
+            print("\tcontinued fractions: {},{}".format(d,r))
+            # Coprimes between d/r = 0 and 1
+            if 1 < d < r < q and r%2 == 0 and math.gcd(d,r) == 1:
+                break
 
         print("\tx={} \tr={}".format(x,r))
     return r
+
+
+def gen_continued_fractions(c, q):
+    """
+    Yields continued fraction approximations for c/q
+    """
+    coefs = gen_continued_fraction_coefs(c,q)
+
+    dn_2 = 0
+    dn_1 = 1
+    rn_2 = 1
+    rn_1 = 0
+    for an in coefs:
+        dn = an * dn_1 + dn_2
+        rn = an * rn_1 + rn_2
+        yield dn, rn
+        dn_2, dn_1 = dn_1, dn
+        rn_2, rn_1 = rn_1, rn
+
+def gen_continued_fraction_coefs(c, q):
+    """
+    Yields an for all n such that
+    c/q = a0 + 1/(a1 + 1/(...))
+    """
+    while c > 0 and q > 0:
+        a = int(c/q)
+        c, q = q, c - q*a
+        yield a
 
 
 def make_circuit(m,n, x, N):
@@ -87,21 +125,4 @@ def make_circuit(m,n, x, N):
 
     return mqft, m
 
-# classical(21)
-
-
-mqft, m = make_circuit(9,4,11,21)
-
-printCircuit(mqft)
-
-o, c = run(mqft, m)
-pyplot.plot(c[mqft])
-pyplot.show()
-
-top_ten = list(reversed(c[mqft].argsort()[-10:]))
-
-print(top_ten)
-print(c[mqft][top_ten])
-
-with open("shors.svg", "w") as w:
-    w.write(make_svg(mqft))
+print("Factors: {}".format(classical(21)))
