@@ -151,10 +151,14 @@ class SvgFeeder(GraphAccumulator):
         return tmp
 
 
-def make_svg(*args):
+def make_svg(*args, filename=None):
     frontier, graphnodes = get_deps(*args)
     frontier = list(sorted(frontier, key=lambda q: q.qid))
     n = sum(f.n for f in frontier)
     graphacc = SvgFeeder(n)
     run_graph(frontier, graphnodes, graphacc)
-    return graphacc.get_svg_text()
+    if filename is None:
+        return graphacc.get_svg_text()
+    else:
+        with open(filename, 'w') as w:
+            w.write(graphacc.get_svg_text())

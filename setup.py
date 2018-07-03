@@ -11,7 +11,7 @@ with open('LICENSE') as f:
 
 setup(
     name='QIP',
-    version='0.1',
+    version='0.2',
     description='Quantum Computing Library',
     long_description=readme,
     author='Sumner Hearth',

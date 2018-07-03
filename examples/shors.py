@@ -2,6 +2,7 @@ from qip.qip import *
 from qip.operators import *
 from qip.qfft import *
 from qip.pipeline import *
+from qip.svgwriter import make_svg
 import numpy
 import math
 import random
@@ -84,6 +85,7 @@ def gen_continued_fractions(c, q):
         dn_2, dn_1 = dn_1, dn
         rn_2, rn_1 = rn_1, rn
 
+
 def gen_continued_fraction_coefs(c, q):
     """
     Yields an for all n such that
@@ -102,7 +104,6 @@ def make_circuit(m,n, x, N):
     :param n: qubits in register 2
     :return: input qubits and output qubits
     """
-
     # Instead of QFFT just initialize to (1/sqrt(2**m))|x>
     default_state = numpy.ones((2 ** m,)) * pow((2 ** m), -1.0 / 2.0)
     reg1 = Qubit(n=m, default=default_state)  # Superposition of each |i>
@@ -121,5 +122,10 @@ def make_circuit(m,n, x, N):
     return mqft, m
 
 
+# Make an example circuit diagram
+mqft, m = make_circuit(9,4,11,21)
+make_svg(mqft, filename='shors.svg')
+
+# Run shors on 21=7*3
 factors = classical(21)
 print("Factors: {}".format(factors))

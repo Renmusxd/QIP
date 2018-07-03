@@ -1,4 +1,5 @@
 from qip.operators import *
+from qip.svgwriter import make_svg
 
 
 q1 = Qubit(n=1)
@@ -8,6 +9,9 @@ q3 = Qubit(n=3)
 h1 = H(q1)
 c1, c2, c3 = C(SwapOp)(h1, q2, q3)
 m1 = H(c1)
+
+# Make example circuit diagram
+make_svg(m1, filename='cswap.svg')
 
 # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
 state2 = numpy.cos(numpy.arange(0,2**q2.n) * numpy.pi/(2.0**q2.n))
