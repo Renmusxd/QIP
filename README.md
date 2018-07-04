@@ -41,4 +41,4 @@ o = m1.run(feed={q1:state1, q2: state2, q3: state3})
 `o` is a vector of size 2048 giving the complete state for each possible `|q1, q2, q3>`
 
 ## Installation
-Can install manually with `python setup.py build_ext --inplace` and `python setup.py install`
+Installation via pip with `pip install qip` or manually by cloning the repo and running `python setup.py build_ext --inplace` and `python setup.py install`
