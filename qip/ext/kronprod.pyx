@@ -1,3 +1,8 @@
+"""
+This code is admittedly a bit of a mess. Many things would be rewritten as functions if it didn't require mixing
+python objects with c objects (i.e. structs).
+"""
+
 from __future__ import division
 import numpy as np
 import cython
@@ -12,19 +17,25 @@ from util cimport *
 cdef enum MatrixType:
     OTHER, NUMPY_MAT, C_MAT, SWAP_MAT
 
-
 cdef struct MatStruct:
     MatrixType mattype
     int param
     # A pointer to the original mat (except for CMAT)
     void* pointer
 
-def count_cmats(mat, count=0):
-    if hasattr(mat, '_kron_struct'):
-        struct_val = mat._kron_struct
+
+def count_extra_mats(mat):
+    count = 0
+    m = mat
+    while hasattr(m, '_kron_struct'):
+        struct_val = m._kron_struct
         if struct_val == C_MAT:
-            return count_cmats(mat.m, count) + 1
-    return count + 1
+            m = m.m
+            count += 1
+        else:
+            break
+    return count
+
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -34,45 +45,79 @@ def cdot_loop(int[:,:] indexgroups, matrices,
     if vec.shape[0] != output.shape[0] or 2**n != vec.shape[0]:
         raise ValueError("Both input and output vectors must be of size 2**n")
 
+    # Get number of matrices including nested cmats
+    cdef n_extra_mats = 0
+    for mat in matrices:
+        n_extra_mats += count_extra_mats(mat)
+
     # First convert to speedy data types
     # matrices should go from a list with objects of type (ndarray | C | Swap) to
     # an array of c structs with relevant information.
     cdef MatStruct* cmatrices = <MatStruct*>malloc(len(matrices)*sizeof(MatStruct))
+    # nullptr unless needed
+    cdef MatStruct* extra_cmatrices
+    if n_extra_mats:
+       extra_cmatrices = <MatStruct*>malloc(n_extra_mats*sizeof(MatStruct))
+
     cdef MatStruct mstruct
     cdef np.ndarray[double complex,ndim=2,mode="c"] numpy_mat
 
-    cdef int i
+    cdef int i, extra_i
+    # Bool was throwing errors with misdefined symbols
+    cdef int adding_extra_mats = False
+    cdef void** last_pointer_loc
     for i in range(len(matrices)):
         mat = matrices[i]
+        adding_extra_mats = False
+        # Assign to null for loop invariant.
+        last_pointer_loc = <void**>0
 
-        mstruct.pointer = <void*>mat
+        while True:
+            # Point to itself by default
+            mstruct.pointer = <void*>mat
 
-        # Find type of matrix
-        struct_val = OTHER
-        if hasattr(mat, '_kron_struct'):
-            struct_val = mat._kron_struct
+            # Find type of matrix
+            struct_val = OTHER
+            if hasattr(mat, '_kron_struct'):
+                struct_val = mat._kron_struct
 
-        elif type(mat) == np.ndarray:
-            struct_val = NUMPY_MAT
+            elif type(mat) == np.ndarray:
+                struct_val = NUMPY_MAT
 
-        # Create struct from matrix
-        mstruct.mattype = struct_val
-        if struct_val == NUMPY_MAT:
-            numpy_mat = mat
-            mstruct.pointer = <void*> numpy_mat.data
-            mstruct.param = mat.shape[0]
+            # Create struct from matrix
+            mstruct.mattype = struct_val
+            if struct_val == NUMPY_MAT:
+                numpy_mat = np.ascontiguousarray(mat, np.complex128)
+                # If numpy point to underlying data
+                mstruct.pointer = <void*> numpy_mat.data
+                mstruct.param = mat.shape[0]
 
-        elif struct_val == SWAP_MAT:
-            mstruct.param = mat.n
+            elif struct_val == SWAP_MAT:
+                mstruct.param = mat.n
 
-        elif struct_val == C_MAT:
-            mstruct.param = mat.shape[0]
-            mstruct.pointer = <void*>mat.m
+            elif struct_val == C_MAT:
+                mstruct.param = mat.shape[0]
+                # Points to python object of conditional operation
+                # can be overwritten later with pointer to MatStruct
+                mstruct.pointer = <void*>mat.m
 
-        elif struct_val == OTHER:
-            mstruct.param = mat.shape[0]
+            elif struct_val == OTHER:
+                mstruct.param = mat.shape[0]
 
-        cmatrices[i] = mstruct
+            if not adding_extra_mats:
+                cmatrices[i] = mstruct
+                last_pointer_loc = &cmatrices[i].pointer
+            else:
+                extra_cmatrices[extra_i] = mstruct
+                last_pointer_loc[0] = &extra_cmatrices[extra_i]
+                last_pointer_loc = &extra_cmatrices[extra_i].pointer
+
+            # We may need to repeat for cmats
+            if struct_val != C_MAT:
+                break
+            else:
+                mat = mat.m
+                adding_extra_mats = True
 
     # Now put values into output
     cdef double complex s, p, matentry
@@ -148,6 +193,7 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 @cython.wraparound(False)
 cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
     cdef double complex* mmat
+    cdef MatStruct* cmstruct
     if mstruct.mattype == C_MAT:
         if mati < mstruct.param >> 1 and matj < mstruct.param >> 1:
             if mati == matj:
@@ -155,9 +201,8 @@ cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
             else:
                 return 0.0
         elif mati >= mstruct.param >> 1 and matj >= mstruct.param >> 1:
-            # In the future try recursively deducing the MatStruct types ahead of time.
-            with gil:
-                return (<object>mstruct.pointer)[mati - (mstruct.param >> 1), matj - (mstruct.param>>1)]
+           cmstruct = <MatStruct*>mstruct.pointer
+           return calc_mat_entry(cmstruct[0], mati - (mstruct.param >> 1), matj - (mstruct.param>>1))
         else:
             return 0.0
 
