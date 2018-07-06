@@ -29,6 +29,9 @@ class MatrixOp(Qubit):
 
 
 class QubitOpWrapper:
+    """
+    Class which wraps normal ops and allows them to split output upon call.
+    """
     def __init__(self, op, *args, **kwargs):
         self.op = op
         self.args = args

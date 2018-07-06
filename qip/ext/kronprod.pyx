@@ -14,6 +14,7 @@ cimport util
 from util cimport *
 
 # To remove dynamic dispatch, use the following enums/structs.
+# if changed then change int values in operators.py
 cdef enum MatrixType:
     OTHER, NUMPY_MAT, C_MAT, SWAP_MAT
 
@@ -54,7 +55,8 @@ def cdot_loop(int[:,:] indexgroups, matrices,
     # matrices should go from a list with objects of type (ndarray | C | Swap) to
     # an array of c structs with relevant information.
     cdef MatStruct* cmatrices = <MatStruct*>malloc(len(matrices)*sizeof(MatStruct))
-    # nullptr unless needed
+    # Now add speedy types for nested C(...) values. Go as far down as possible and add pointers
+    # to relevant addresses.
     cdef MatStruct* extra_cmatrices
     if n_extra_mats:
        extra_cmatrices = <MatStruct*>malloc(n_extra_mats*sizeof(MatStruct))
@@ -188,6 +190,7 @@ def cdot_loop(int[:,:] indexgroups, matrices,
             output[row] = s
         # nogil
         free(cmatrices)
+        free(extra_cmatrices)
 
 
 @cython.boundscheck(False)
