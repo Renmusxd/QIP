@@ -47,24 +47,22 @@ def cdot_loop(int[:,:] indexgroups, matrices,
         raise ValueError("Both input and output vectors must be of size 2**n")
 
     # Get number of matrices including nested cmats
-    cdef n_extra_mats = 0
+    cdef int n_extra_mats = 0
     for mat in matrices:
         n_extra_mats += count_extra_mats(mat)
 
     # First convert to speedy data types
     # matrices should go from a list with objects of type (ndarray | C | Swap) to
     # an array of c structs with relevant information.
-    cdef MatStruct* cmatrices = <MatStruct*>malloc(len(matrices)*sizeof(MatStruct))
+    cdef MatStruct* cmatrices = <MatStruct*>malloc((n_extra_mats+len(matrices))*sizeof(MatStruct))
     # Now add speedy types for nested C(...) values. Go as far down as possible and add pointers
     # to relevant addresses.
-    cdef MatStruct* extra_cmatrices
-    if n_extra_mats:
-       extra_cmatrices = <MatStruct*>malloc(n_extra_mats*sizeof(MatStruct))
 
     cdef MatStruct mstruct
     cdef np.ndarray[double complex,ndim=2,mode="c"] numpy_mat
 
-    cdef int i, extra_i
+    cdef int i
+    cdef int extra_i = len(matrices)
     # Bool was throwing errors with misdefined symbols
     cdef int adding_extra_mats = False
     cdef void** last_pointer_loc
@@ -110,9 +108,9 @@ def cdot_loop(int[:,:] indexgroups, matrices,
                 cmatrices[i] = mstruct
                 last_pointer_loc = &cmatrices[i].pointer
             else:
-                extra_cmatrices[extra_i] = mstruct
-                last_pointer_loc[0] = &extra_cmatrices[extra_i]
-                last_pointer_loc = &extra_cmatrices[extra_i].pointer
+                cmatrices[extra_i] = mstruct
+                last_pointer_loc[0] = &cmatrices[extra_i]
+                last_pointer_loc = &cmatrices[extra_i].pointer
                 extra_i += 1
 
             # We may need to repeat for cmats
@@ -188,9 +186,8 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 
                 s = s + (p*vec[colbits])
             output[row] = s
-        # nogil
-        free(cmatrices)
-        free(extra_cmatrices)
+    # nogil
+    free(cmatrices)
 
 
 @cython.boundscheck(False)
