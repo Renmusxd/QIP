@@ -336,6 +336,16 @@ class TestQubitMethods(unittest.TestCase):
         o, _ = run(q1, r2)
         self.assertTrue(numpy.allclose(numpy.abs(o), [0, 1.0, 0, 0]))
 
+    def test_toffoli(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=1)
+        q3 = Qubit(n=1)
+
+        # CCNOT
+        c1, c2, c3 = C(C(Not))(q1,q2,q3)
+
+        o, c = run(c1,c2,c3, feed={q1: [pow(2,-0.5),pow(2,-0.5)], q2: [pow(2,-0.5), pow(2,-0.5)]})
+        self.assertTrue(numpy.allclose(numpy.abs(o), [0.5,0,0.5,0,0.5,0,0,0.5]))
 
 if __name__ == '__main__':
     unittest.main()

@@ -111,6 +111,7 @@ def cdot_loop(int[:,:] indexgroups, matrices,
                 extra_cmatrices[extra_i] = mstruct
                 last_pointer_loc[0] = &extra_cmatrices[extra_i]
                 last_pointer_loc = &extra_cmatrices[extra_i].pointer
+                extra_i += 1
 
             # We may need to repeat for cmats
             if struct_val != C_MAT:

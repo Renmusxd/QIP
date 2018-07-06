@@ -69,7 +69,7 @@ class Qubit(PipelineObject):
     """
     QID = 0
 
-    def __init__(self, *inputs, n=None, qid=None, nosink=False, default=None, quantum=True):
+    def __init__(self, *inputs, n=None, qid=None, nosink=False, default=None, quantum=True, **kwargs):
         """
         Create a qubit object
         :param inputs: inputs to qubit, qubit acts as identity on each

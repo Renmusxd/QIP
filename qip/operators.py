@@ -21,7 +21,6 @@ class MatrixOp(Qubit):
         """
         if self.ms is None:
             self.ms = self.makemats(qbitindex)
-
         kronselect_dot(self.ms, inputvals, n, arena)
         return arena, inputvals,  (0, None)
 
@@ -29,11 +28,19 @@ class MatrixOp(Qubit):
         raise NotImplemented("This method should never be called.")
 
 
-def Not(*inputs, **kwargs):
-    n = NotOp(*inputs, **kwargs)
-    if len(inputs) > 1:
-        return n.split()
-    return n
+class QubitOpWrapper:
+    def __init__(self, op, *args, **kwargs):
+        self.op = op
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, *inputs, nosplit=False, **kwargs):
+        kwargs = self.kwargs.copy()
+        kwargs.update(kwargs)
+        n = self.op(*self.args, *inputs, **kwargs)
+        if len(n.inputs) > 1 and not nosplit:
+            return n.split()
+        return n
 
 
 class NotOp(MatrixOp):
@@ -48,11 +55,7 @@ class NotOp(MatrixOp):
         return "Not({})".format(self.qid)
 
 
-def H(*inputs, **kwargs):
-    h = HOp(*inputs, **kwargs)
-    if len(inputs) > 1:
-        return h.split()
-    return h
+Not = QubitOpWrapper(NotOp)
 
 
 class HOp(MatrixOp):
@@ -68,11 +71,7 @@ class HOp(MatrixOp):
         return "H({})".format(self.qid)
 
 
-def R(phi, *inputs, **kwargs):
-    r = ROp(phi, *inputs, **kwargs)
-    if len(inputs) > 1:
-        return r.split()
-    return r
+H = QubitOpWrapper(HOp)
 
 
 class ROp(MatrixOp):
@@ -88,11 +87,7 @@ class ROp(MatrixOp):
         return "R({})".format(",".join(map(repr,self.inputs)))
 
 
-def Rm(m, *inputs, negate=False, **kwargs):
-    r = RmOp(m, *inputs, negate=negate, **kwargs)
-    if len(inputs) > 1:
-        return r.split()
-    return r
+R = QubitOpWrapper(ROp)
 
 
 class RmOp(ROp):
@@ -104,11 +99,8 @@ class RmOp(ROp):
         return "R[{}]({})".format(self.m, ",".join(map(repr,self.inputs)))
 
 
-def Swap(*inputs, **kwargs):
-    s = SwapOp(*inputs, **kwargs)
-    if len(inputs) > 1:
-        return s.split()
-    return s
+Rm = QubitOpWrapper(RmOp)
+
 
 class SwapOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
@@ -126,6 +118,9 @@ class SwapOp(MatrixOp):
 
     def __repr__(self):
         return "Swap({})".format(self.qid)
+
+
+Swap = QubitOpWrapper(SwapOp)
 
 
 class SwapMat(object):
@@ -160,10 +155,7 @@ def C(op):
     :return: A Class C-Op which takes as a first input the controlling qubit and
     remaining inputs as a normal op.
     """
-    if issubclass(type(op), MatrixOp) or True:
-        return lambda *inputs: COp(op, *inputs).split()
-    else:
-        raise Exception("COp currently only works with matrix operations.")
+    return QubitOpWrapper(COp, op)
 
 
 class COp(MatrixOp):
@@ -176,7 +168,17 @@ class COp(MatrixOp):
             raise ValueError("Control bit can only be of size n=1")
         if len(set(inputs)) < len(inputs):
             raise ValueError("Cannot have repeated qubits in COp")
-        self.op = op(*inputs[1:], nosink=True, **kwargs)
+
+        # Directly editing kwargs causes issues on subsequent calls, and putting it in
+        # the op call directory can cause issues with C(C(...)) calls with multiple nosink defs.
+        nkwargs = kwargs.copy()
+        nkwargs['nosink'] = True
+        nkwargs['nosplit'] = True
+        self.op = op(*inputs[1:], **nkwargs)
+
+        if not issubclass(type(self.op), MatrixOp) or issubclass(type(self.op), SwapMat):
+            raise ValueError("C(Op) may only be applied to matrix ops and swaps, not {}".format(type(self.op)))
+
         super().__init__(*inputs, qid=self.op.qid, **kwargs)
 
     def makemats(self, qbitindex):
@@ -215,11 +217,6 @@ class CMat(object):
             raise ValueError("CMat can only be indexed with M[i,j] not M[{}]".format(item))
 
 
-def F(func, reg1, reg2, **kwargs):
-    f = FOp(func, reg1, reg2, **kwargs)
-    return f.split()
-
-
 class FOp(Qubit):
     def __init__(self, func, reg1, reg2, **kwargs):
         super().__init__(reg1, reg2, **kwargs)
@@ -235,3 +232,6 @@ class FOp(Qubit):
 
     def __repr__(self):
         return "F({}, {})".format(self.reg1, self.reg2)
+
+
+F = QubitOpWrapper(FOp)
