@@ -12,6 +12,7 @@ except ModuleNotFoundError:
                     "cython at install but has no clear documentation to make it work the same way as out-of-the-box "
                     "cython. Just run:\npip install cython\nthen reinstall QIP as usual.")
 else:
+    # Taken from https://stackoverflow.com/questions/2379898 user R_Beagrie
     class CustomBuildExtCommand(build_ext):
         """build_ext command for use when numpy headers are needed."""
         def run(self):
