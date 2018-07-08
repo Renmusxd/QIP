@@ -1,26 +1,45 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup, find_packages
 from distutils.extension import Extension
-from Cython.Build import cythonize
-import numpy
+from setuptools.command.build_ext import build_ext
 
-readme = "QIP: A quantum computing simulation library."
+# This awful setup is because cython is required to run the file responsible to fetching cython, likewise numpy
+# needs to provide header information prior to install. Pull requests welcome!
+try:
+    from Cython.Build import cythonize
+except ModuleNotFoundError:
+    raise Exception("Cython must be installed before attempting to install QIP. Setuptools + Pip technically supports "
+                    "cython at install but has no clear documentation to make it work the same way as out-of-the-box "
+                    "cython. Just run:\npip install cython\nthen reinstall QIP as usual.")
+else:
+    class CustomBuildExtCommand(build_ext):
+        """build_ext command for use when numpy headers are needed."""
+        def run(self):
+            import numpy
+            from Cython.Build import cythonize
 
-with open('LICENSE') as f:
-    license = f.read()
+            self.include_dirs.append(numpy.get_include())
+            build_ext.run(self)
 
-setup(
-    name='QIP',
-    version='0.2.4',
-    description='Quantum Computing Library',
-    long_description=readme,
-    author='Sumner Hearth',
-    author_email='sumnernh@gmail.com',
-    url='https://github.com/Renmusxd/QIP',
-    license=license,
-    packages=find_packages(exclude=('tests','benchmark')),
-    ext_modules=cythonize([
-        Extension("qip.ext.*", ["qip/ext/*.pyx"], extra_compile_args=["-O3"], include_dirs=[numpy.get_include()])
-    ]),
-    install_requires=['numpy>=1.13.1', 'cython>=0.27.3']
-)
+    with open('LICENSE') as f:
+        license = f.read()
+
+    setup(
+        name='QIP',
+        version='0.3',
+        python_requires='>3.4',
+        description='Quantum Computing Library',
+        long_description="QIP: A quantum computing simulation library.",
+        author='Sumner Hearth',
+        author_email='sumnernh@gmail.com',
+        url='https://github.com/Renmusxd/QIP',
+        license=license,
+        packages=find_packages(exclude=('tests','benchmark')),
+        cmdclass={'build_ext': CustomBuildExtCommand},
+        requires=['numpy', 'cython'],
+        install_requires=['numpy', 'cython'],
+        setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
+        ext_modules=cythonize([Extension("qip.ext.*",
+                               sources=["qip/ext/*.pyx"],
+                               extra_compile_args=["-O3"])])
+    )
