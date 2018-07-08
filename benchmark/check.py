@@ -1,7 +1,7 @@
 from qip.operators import *
 from qip.pipeline import run
 import time
-
+from matplotlib import pyplot
 
 def timef(f, *args, iters=1):
     acc = 0
@@ -18,5 +18,8 @@ def test(n):
     o = run(q1, n2, feed={q2: [1.0, 0.0]})
 
 
-# Don't push 29 qubits over 180s
-assert timef(test, 29, iters=1) < 180
+ns = list(range(2,24,1))
+times = [timef(test, n, iters=3) for n in ns]
+
+pyplot.semilogy(ns,times)
+pyplot.show()

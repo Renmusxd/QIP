@@ -13,7 +13,6 @@ class TestQfftMethods(unittest.TestCase):
         q = Qubit(n=2)
         qft = QFFT(q)
         o, _ = qft.run(feed={q: [0.5, 0.5, 0.5, 0.5]})
-        print(o)
         self.assertTrue(numpy.allclose(o, [1., 0., 0., 0.]))
 
     def test_cosine_pipeline(self):
