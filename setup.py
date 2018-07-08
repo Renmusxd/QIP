@@ -22,5 +22,5 @@ setup(
     ext_modules=cythonize([
         Extension("qip.ext.*", ["qip/ext/*.pyx"], extra_compile_args=["-O3"], include_dirs=[numpy.get_include()])
     ]),
-    install_requires=['numpy>=1.13.1', 'scipy>=0.19.1', 'cython>=0.27.3']
+    install_requires=['numpy>=1.13.1', 'cython>=0.27.3']
 )
