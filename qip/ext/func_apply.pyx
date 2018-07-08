@@ -70,11 +70,10 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
 
             # Now can use to calculate offsets.
             # |x>|f(x)>|r> = |x>|0>|r> for all |r>
-            if vec_f_offset != 0:
-                for r in range(2**other_indices.shape[0]):
-                    vec_r_offset = 0
-                    # TODO check this code.
-                    for j in range(reg2_indices.shape[0]):
-                        vec_r_offset = set_bit(vec_r_offset, (n-1) - other_indices[j],
-                                               get_bit(r, (n_remaining-1) - j))
-                    output[vec_zero_index | vec_f_offset | vec_r_offset] = vec[vec_zero_index | vec_r_offset]
+            for r in range(2**other_indices.shape[0]):
+                vec_r_offset = 0
+                # TODO check this code.
+                for j in range(reg2_indices.shape[0]):
+                    vec_r_offset = set_bit(vec_r_offset, (n-1) - other_indices[j],
+                                           get_bit(r, (n_remaining-1) - j))
+                output[vec_zero_index | vec_f_offset | vec_r_offset] = vec[vec_zero_index | vec_r_offset]
