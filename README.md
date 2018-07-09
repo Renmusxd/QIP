@@ -35,10 +35,9 @@ state3 = numpy.zeros((32,))
 state3[1] = 1.0
 
 # Feed the initial states for each set of qubits
-# Takes about 1.6s on a 3.5Ghz processor
 o = m1.run(feed={q1:state1, q2: state2, q3: state3})
 ```
 `o` is a vector of size 2048 giving the complete state for each possible `|q1, q2, q3>`
 
 ## Installation
-Installation via pip with `pip install cython && pip install qip` or manually by cloning the repo, install requirements from `requirements.txt`, and running `python setup.py build_ext --inplace && python setup.py install`.
+Installation via pip with `pip install qip` or manually by cloning the repo, install requirements from `requirements.txt` using `pip install -r requirements.txt`, and run `python setup.py build_ext --inplace && python setup.py install`.
