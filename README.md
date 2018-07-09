@@ -35,7 +35,6 @@ state3 = numpy.zeros((32,))
 state3[1] = 1.0
 
 # Feed the initial states for each set of qubits
-# Takes about 1.6s on a 3.5Ghz processor
 o = m1.run(feed={q1:state1, q2: state2, q3: state3})
 ```
 `o` is a vector of size 2048 giving the complete state for each possible `|q1, q2, q3>`
