@@ -5,7 +5,7 @@ from setuptools.command.build_ext import build_ext
 
 try:
     from Cython.Build import cythonize
-except ModuleNotFoundError:
+except ImportError:
     # I can't find a nicer way to do this. Pull requests graciously accepted.
 
     # Make fake cythonize call for use now, Extensions will fail and restart
