@@ -1,5 +1,5 @@
 import unittest
-from qip.qip import Qubit, Measure, StochasticMeasure
+from qip.qip import *
 from qip.operators import *
 from qip.pipeline import run
 
@@ -151,7 +151,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=1)
 
         h1 = H(q1)
-        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+        c1, c2, c3 = C(Swap)(h1, q2, q3)
         m1 = H(c1)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3>
@@ -174,7 +174,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=2)
 
         h1 = H(q1)
-        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+        c1, c2, c3 = C(Swap)(h1, q2, q3)
         m1 = H(c1)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
@@ -198,7 +198,7 @@ class TestQubitMethods(unittest.TestCase):
 
         h1 = H(q1)
 
-        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+        c1, c2, c3 = C(Swap)(h1, q2, q3)
         m1 = H(c1)
 
         # CSwap compare should give P(|q1=0>) = 1/2 + 1/2<q2|q3> = 1/2
@@ -265,7 +265,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=2)
 
         h1 = H(q1)
-        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+        c1, c2, c3 = C(Swap)(h1, q2, q3)
         mh1 = H(c1)
 
         m1 = Measure(mh1)
@@ -283,7 +283,7 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=2)
 
         h1 = H(q1)
-        c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+        c1, c2, c3 = C(Swap)(h1, q2, q3)
         mh1 = H(c1)
 
         m1 = Measure(mh1)
