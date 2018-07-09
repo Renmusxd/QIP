@@ -1,2 +1,2 @@
-numpy>=1.13.1
-cython>=0.27.3
+numpy
+cython
