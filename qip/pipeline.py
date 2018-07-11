@@ -1,9 +1,10 @@
 import numpy
 from qip.util import gen_edit_indices
 from qip.util import flatten
+from qip.backend import CythonBackend
 
 
-def run(*args, state=None, feed=None, statetype=numpy.complex128, strict=False, **kwargs):
+def run(*args, state=None, feed=None, statetype=numpy.complex128, strict=False, backend_constructor=CythonBackend, **kwargs):
     """
     Runs pipeline using all qubits in *args. Produces an output state based on input.
     :param args: list of qubits to evaluate
@@ -37,38 +38,22 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, strict=False, 
         missing_qubits = [qubit for qubit in frontier if qubit not in feed]
         if len(missing_qubits):
             raise ValueError("Missing Qubit states for: {}".format(missing_qubits))
-    # else:
-    #     undefined qubits default to |0>
 
-    n = sum(q.n for q in frontier)
-    if state is None:
-        qbitindex = {}
-        n = 0
-        for qbit in sorted(frontier, key=lambda q: q.qid):
-            qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
-            n += qbit.n
+    qbitindex = {}
+    n = 0
+    for qbit in sorted(frontier, key=lambda q: q.qid):
+        qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
+        n += qbit.n
 
-        state = numpy.zeros(2**n, dtype=statetype)
+    backend = backend_constructor(n)
 
-        if len(qbits) == 0:
-            state[0] = 1
+    feed_index_groups = [qbitindex[qbit] for qbit in qbits]
+    feed_states = [feed[qbits[qindex]] for qindex in range(len(qbits))]
 
-        # Set all the entries in state to product of matrix entries
-        for index, flips in gen_edit_indices([qbitindex[qbit] for qbit in qbits], n-1):
-            state[index] = 1.0
-            for qindex, flip in enumerate(flips):
-                qbit = qbits[qindex]
-                state[index] = state[index] * feed[qbit][flip]
-    elif type(state) == int:
-        stateint = state
-        state = numpy.zeros(2**n, dtype=statetype)
-        state[stateint] = 1.0
-    elif len(state) != 2**n:
-        raise ValueError("State size must be 2**n")
-    elif type(state) == list:
-        state = numpy.array(state)
+    state, arena = backend.make_state(feed_index_groups, feed_states,
+                                      state=state, statetype=statetype)
 
-    return feed_forward(frontier, state, graphnodes, statetype=statetype)
+    return feed_forward(frontier, state, arena, graphnodes, backend)
 
 
 def get_deps(*args, feed=None):
@@ -158,26 +143,27 @@ def run_graph(frontier, graphnodes, graphacc):
 
 
 class NodeFeeder(GraphAccumulator):
-    def __init__(self, state, n, statetype=numpy.complex128):
-        self.state = state.astype(statetype)
-        self.arena = numpy.ndarray(shape=(2 ** n,), dtype=statetype)
+    def __init__(self, state, arena, n, backend):
+        self.state = state
+        self.arena = arena
         self.n = n
         self.classic_map = {}
+        self.backend = backend
 
         if len(self.state) != 2 ** n:
             raise ValueError("Size of state must be 2**n")
 
     def feed(self, qbitindex, node):
-        self.state, self.arena, (n_bits, bits) = node.feed(self.state, qbitindex, self.n, self.arena)
+        self.state, self.arena, (n_bits, bits) = node.feed(self.state, qbitindex, self.n, self.arena, self.backend)
 
         if n_bits > 0 or bits is not None:
             self.classic_map[node] = bits
             self.n -= n_bits
 
 
-def feed_forward(frontier, state, graphnodes, statetype=numpy.complex128):
+def feed_forward(frontier, state, arena, graphnodes, backend):
     n = sum(f.n for f in frontier)
-    graphacc = NodeFeeder(state, n, statetype)
+    graphacc = NodeFeeder(state, arena, n, backend)
     run_graph(frontier, graphnodes, graphacc)
     return graphacc.state, graphacc.classic_map
 

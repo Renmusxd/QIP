@@ -10,21 +10,18 @@ class MatrixOp(Qubit):
         super().__init__(*inputs, **kwargs)
         self.ms = None
 
-    def feed(self, inputvals, qbitindex, n, arena):
-        """
-        Operate on the state of the system.
-        :param inputvals: 2**n complex values
-        :param qbitindex: mapping of qbit to global index
-        :param n: number of qubits
-        :param arena: memory arena to use for computations, must be of size 2**n
-        :return: (2**n complex values of applying Q to input, memory arena of size 2**n, (num classic bits, int bits))
-        """
+    def feed_indices(self, inputvals, index_groups, n, arena, backend):
         if self.ms is None:
-            self.ms = self.makemats(qbitindex)
-        kronselect_dot(self.ms, inputvals, n, arena)
+            self.ms = self.makemats(index_groups)
+        backend.kronselect_dot(self.ms, inputvals, n, arena)
         return arena, inputvals,  (0, None)
 
-    def makemats(self, qbitindex):
+    def makemats(self, index_groups):
+        """
+        Make matrix to be used by the op
+        :param index_groups:
+        :return: dict from index groups to matrix
+        """
         raise NotImplemented("This method should never be called.")
 
 
@@ -50,9 +47,9 @@ class NotOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
 
-    def makemats(self, qbitindex):
+    def makemats(self, index_groups):
         return {i: numpy.flip(numpy.eye(2), 0)
-                for i in flatten([qbitindex[inp] for inp in self.inputs])}
+                for i in flatten(index_groups)}
 
     def __repr__(self):
         return "Not({})".format(self.qid)
@@ -65,10 +62,10 @@ class HOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
 
-    def makemats(self, qbitindex):
+    def makemats(self, index_groups):
         # TODO: fix so that H(multiple qubits) meets the standard and isn't just H on each.
         return {i: (1/numpy.sqrt(2))*numpy.array([[1, 1], [1, -1]])
-                for i in flatten([qbitindex[inp] for inp in self.inputs])}
+                for i in flatten(index_groups)}
 
     def __repr__(self):
         return "H({})".format(self.qid)
@@ -82,9 +79,9 @@ class ROp(MatrixOp):
         super().__init__(*inputs, **kwargs)
         self.exponented = numpy.exp(1.0j * phi)
 
-    def makemats(self, qbitindex):
+    def makemats(self, index_groups):
         return {i: numpy.array([[1, 0], [0, self.exponented]])
-                for i in flatten([qbitindex[inp] for inp in self.inputs])}
+                for i in flatten(index_groups)}
 
     def __repr__(self):
         return "R({})".format(",".join(map(repr,self.inputs)))
@@ -113,10 +110,10 @@ class SwapOp(MatrixOp):
         if self.inputs[0].n != self.inputs[1].n:
             raise Exception("Inputs must be of equal size {}/{}".format(self.inputs[0], self.inputs[1]))
 
-    def makemats(self, qbitindex):
+    def makemats(self, index_groups):
         swapn = self.inputs[0].n
-        a_indices = qbitindex[self.inputs[0]]
-        b_indices = qbitindex[self.inputs[1]]
+        a_indices = index_groups[0]
+        b_indices = index_groups[1]
         return {tuple(flatten([a_indices, b_indices])): SwapMat(swapn)}
 
     def __repr__(self):
@@ -184,11 +181,11 @@ class COp(MatrixOp):
 
         super().__init__(*inputs, qid=self.op.qid, **kwargs)
 
-    def makemats(self, qbitindex):
-        opm = self.op.makemats(qbitindex)
+    def makemats(self, index_groups):
+        opm = self.op.makemats(index_groups[1:])
         newdict = {}
         for indices in opm:
-            newindices = tuple(flatten([qbitindex[self.inputs[0]], indices]))
+            newindices = tuple(flatten([index_groups[0], indices]))
             newdict[newindices] = CMat(opm[indices])
         return newdict
 
@@ -227,10 +224,10 @@ class FOp(Qubit):
         self.reg1 = reg1
         self.reg2 = reg2
 
-    def feed(self, inputvals, qbitindex, n, arena):
-        reg1 = numpy.array(qbitindex[self.reg1], dtype=numpy.int32)
-        reg2 = numpy.array(qbitindex[self.reg2], dtype=numpy.int32)
-        func_apply(reg1, reg2, self.func, inputvals, n, arena)
+    def feed_indices(self, inputvals, index_groups, n, arena, backend):
+        reg1 = numpy.array(index_groups[0], dtype=numpy.int32)
+        reg2 = numpy.array(index_groups[1], dtype=numpy.int32)
+        backend.func_apply(reg1, reg2, self.func, inputvals, n, arena)
         return arena, inputvals, (0, None)
 
     def __repr__(self):
