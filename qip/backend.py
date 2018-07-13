@@ -24,6 +24,9 @@ class Backend:
     def measure_probabilities(self, indices, n, vec):
         raise NotImplemented("measure_probabilities not implemented by base class")
 
+    def close(self):
+        pass
+
 
 class CythonBackend(Backend):
     def __init__(self, n):

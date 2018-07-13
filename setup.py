@@ -2,6 +2,7 @@
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 from setuptools.command.build_ext import build_ext
+import os
 
 try:
     from Cython.Build import cythonize
@@ -32,6 +33,12 @@ class CustomBuildExtCommand(build_ext):
 with open('LICENSE') as f:
     license = f.read()
 
+parallel_flags = ['-fopenmp']
+
+has_openmp = True
+
+extra_compile_flags = ["-O3", "-ffast-math", "-march=native"] + parallel_flags if has_openmp else []
+extra_link_args = parallel_flags if has_openmp else []
 
 setup(
     name='QIP',
@@ -50,6 +57,8 @@ setup(
     install_requires=['numpy', 'cython'],
     setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
     ext_modules=cythonize([Extension('qip.ext.*',
-                           sources=['qip/ext/*.pyx', 'qip/ext/*.pxd'],
-                           extra_compile_args=['-O3'])])
+                           sources=['qip/ext/*.pyx'],
+                           # libraries=["m"],
+                           extra_compile_args=extra_compile_flags,
+                           extra_link_args=extra_link_args)])
 )

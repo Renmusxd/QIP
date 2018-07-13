@@ -4,8 +4,10 @@ python objects with c objects (i.e. structs).
 """
 
 from __future__ import division
+
 import numpy as np
 import cython
+from cython import parallel
 cimport numpy as np
 from libc.stdlib cimport malloc, free
 import math
@@ -124,6 +126,7 @@ def cdot_loop(int[:,:] indexgroups, matrices,
     cdef double complex s, p, matentry
     cdef int r, c
     cdef int nindexgroups = len(indexgroups)
+    cdef long[:] indexgroupsizes = np.array([indexgroups[i].shape[0] for i in range(nindexgroups)], dtype=np.int)
     cdef int[:] flatindices = np.array(list(sorted(set(index for indices in indexgroups for index in indices))),
                                        dtype=np.int32)
 
@@ -138,54 +141,46 @@ def cdot_loop(int[:,:] indexgroups, matrices,
     cdef int len_indexgroup
     cdef int row, j, indexgroupindex, matindexindex
 
-    # This speeds up by 25%
-    cdef int[:] indexgroup
+    # Build each entry in output.
+    for row in parallel.prange(two_n, schedule='static', nogil=True, num_threads=16):
+        s = 0.0
+        colbits = row
 
-    # Currently parallelism slows down because we can't take advantage
-    # of the memory view long[:] up above.
-    with nogil:
-        for row in range(two_n):
-            s = 0.0
-            colbits = row
+        # Generate valid columns and calculate required bitflips
+        for i in range(two_nindices):
+            # Edit colbits
+            for j in range(nindices):
+                indx = flatindices[j]
+                # colbits[indx] = matcol[j]
+                colbits = set_bit(colbits, (n-1) - indx, get_bit(i, (nindices-1)-j))
 
-            # Generate valid columns and calculate required bitflips
-            for i in range(two_nindices):
-                # Edit colbits
-                # TODO add system for getting "next non-zero index on row" for matrices like SWAP which are very sparse.
-                for j in range(nindices):
-                    indx = flatindices[j]
-                    # colbits[indx] = matcol[j]
-                    colbits = set_bit(colbits, (n-1) - indx, get_bit(i, (nindices-1)-j))
+            p = 1.0
+            # Get entry in kron-matrix by multiplying relevant sub-matrices
+            for indexgroupindex in range(nindexgroups):
+                # For some reason it's still performing wrap-around and
+                # bounds checking here.
+                len_indexgroup = indexgroupsizes[indexgroupindex]
+                mstruct = cmatrices[indexgroupindex]
 
-                p = 1.0
-                # Get entry in kron-matrix by multiplying relevant sub-matrices
-                for indexgroupindex in range(nindexgroups):
-                    # For some reason it's still performing wrap-around and
-                    # bounds checking here.
-                    indexgroup = indexgroups[indexgroupindex,:]
-                    len_indexgroup = indexgroup.shape[0]
+                submati = 0
+                submatj = 0
 
-                    mstruct = cmatrices[indexgroupindex]
+                # Get indices for matrix in mstruct (submati, submatj)
+                for matindexindex in range(len_indexgroup):
+                    matindex = indexgroups[indexgroupindex,matindexindex]
+                    submati = set_bit(submati, (len_indexgroup-1) - matindexindex,
+                                      get_bit(row, (n-1) - matindex))
+                    submatj = set_bit(submatj, (len_indexgroup-1) - matindexindex,
+                                      get_bit(colbits, (n-1) - matindex))
+                matentry = calc_mat_entry(mstruct, submati, submatj)
+                p = p*matentry
 
-                    submati = 0
-                    submatj = 0
+                # If p == 0.0 then exit early
+                if p == 0.0:
+                    break
 
-                    # Get indices for matrix in mstruct (submati, submatj)
-                    for matindexindex in range(len_indexgroup):
-                        matindex = indexgroup[matindexindex]
-                        submati = set_bit(submati, (len_indexgroup-1) - matindexindex,
-                                          get_bit(row, (n-1) - matindex))
-                        submatj = set_bit(submatj, (len_indexgroup-1) - matindexindex,
-                                          get_bit(colbits, (n-1) - matindex))
-                    matentry = calc_mat_entry(mstruct, submati, submatj)
-                    p = p*matentry
-
-                    # If p == 0.0 then exit early
-                    if p == 0.0:
-                        break
-
-                s = s + (p*vec[colbits])
-            output[row] = s
+            s = s + (p*vec[colbits])
+        output[row] = s
     # nogil
     free(cmatrices)
 

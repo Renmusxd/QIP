@@ -18,8 +18,10 @@ def test(n):
     o = run(q1, n2, feed={q2: [1.0, 0.0]})
 
 
-ns = list(range(2,24,1))
-times = [timef(test, n, iters=3) for n in ns]
+print(timef(test, 25, iters=3))
 
-pyplot.semilogy(ns,times)
-pyplot.show()
+# ns = list(range(2,24,1))
+# times = [timef(test, n, iters=3) for n in ns]
+
+# pyplot.semilogy(ns,times)
+# pyplot.show()
