@@ -14,13 +14,26 @@ class PipelineObject(object):
     def run(self, state=None, feed=None, **kwargs):
         return run(self, state=state, feed=feed, **kwargs)
 
-    def feed(self, inputvals, qbitindex, n, arena):
+    def feed(self, inputvals, qbitindex, n, arena, backend):
         """
         Operate on the state of the system.
         :param inputvals: 2**n complex values
         :param qbitindex: mapping of qbit to global index
         :param n: number of qubits
         :param arena: memory arena to use for computations, must be of size 2**n
+        :param backend: backend to use for matrix operations
+        :return: (2**n complex values of applying Q to input, memory arena of size 2**n, (num classic bits, int bits))
+        """
+        return self.feed_indices(inputvals, [qbitindex[q] for q in self.inputs], n, arena, backend)
+
+    def feed_indices(self, inputvals, index_groups, n, arena, backend):
+        """
+        Operate on the state of the system.
+        :param inputvals: 2**n complex values
+        :param index_groups: array of arrays of indicies used by each input in order.
+        :param n: number of qubits
+        :param arena: memory arena to use for computations, must be of size 2**n
+        :param backend: backend to use for matrix operations
         :return: (2**n complex values of applying Q to input, memory arena of size 2**n, (num classic bits, int bits))
         """
         # Check to make sure enough are given
@@ -174,19 +187,10 @@ class Measure(Qubit):
             for item in inputs:
                 item.set_sink(self)
 
-    def feed(self, inputvals, qbitindex, n, arena):
-        """
-        Operate on the state of the system.
-        :param inputvals: 2**n complex values
-        :param qbitindex: mapping of qbit to global index
-        :param n: number of qubits
-        :param arena: memory arena to use for computations, must be of size 2**n
-        :return: (2**(n-m) complex values of applying Q to input, memory arena of size 2**(n-m), (m, bits)) where
-                 m is the number of qubits being measured.
-        """
+    def feed_indices(self, inputvals, index_groups, n, arena, backend):
         # Get indices and make measurement
-        indices = numpy.array(flatten(qbitindex[q] for q in self.inputs), dtype=numpy.int32)
-        bits = measure(indices, n, inputvals, arena)
+        indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
+        bits = backend.measure(indices, n, inputvals, arena)
 
         # Cut and kill old memory after measurement so that footprint never grows above original.
         tmp_size = inputvals.shape[0]
@@ -236,19 +240,10 @@ class StochasticMeasure(Qubit):
             for item in inputs:
                 item.set_sink(self)
 
-    def feed(self, inputvals, qbitindex, n, arena):
-        """
-        Operate on the state of the system.
-        :param inputvals: 2**n complex values
-        :param qbitindex: mapping of qbit to global index
-        :param n: number of qubits
-        :param arena: memory arena to use for computations, must be of size 2**n
-        :return: (2**(n-m) complex values of applying Q to input, memory arena of size 2**(n-m), (m, bits)) where
-                 m is the number of qubits being measured.
-        """
+    def feed_indices(self, inputvals, index_groups, n, arena, backend):
         # Get indices and make measurement
-        indices = numpy.array(flatten(qbitindex[q] for q in self.inputs), dtype=numpy.int32)
-        probs = measure_probabilities(indices, n, inputvals).copy()
+        indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
+        probs = backend.measure_probabilities(indices, n, inputvals).copy()
 
         return inputvals, arena, (0, probs)
 

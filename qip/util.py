@@ -2,10 +2,9 @@ from __future__ import print_function
 
 import numpy
 import collections
-import qip.ext.kronprod as kronprod
 
 
-def kronselect_dot(mats, vec, n, outputarray, cmode=True):
+def kronselect_dot(mats, vec, n, outputarray, dot_impl=None):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec
     for the case where most mj are identity.
@@ -42,13 +41,13 @@ def kronselect_dot(mats, vec, n, outputarray, cmode=True):
             raise Exception("Shape of square submatrix must equal 2**(number of indices): "
                             "{}: {}".format(indices, m))
 
-    if cmode:
+    if dot_impl is not None:
         iter_indices = newmats.keys()
         cindices = numpy.array([numpy.array(x, dtype=numpy.int32) for x in iter_indices])
         cmats = numpy.array([newmats[x] if type(newmats[x]) != numpy.ndarray else newmats[x].astype(numpy.complex128)
                              for x in iter_indices])
 
-        kronprod.cdot_loop(cindices, cmats, vec, n, outputarray)
+        dot_impl(cindices, cmats, vec, n, outputarray)
     else:
         # Sort all keys and make into tuples
         dot_loop(newmats, vec, n, outputarray)
@@ -91,7 +90,6 @@ def gen_valid_col_and_matcol(row, matindices, n):
 def gen_edit_indices(index_groups, maxindex):
     if len(index_groups) > 0:
         allindices = flatten(index_groups)
-        #maxindex = max(allindices)
 
         bits = [0] * (maxindex+1)
         for i in range(2**len(allindices)):

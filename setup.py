@@ -35,7 +35,7 @@ with open('LICENSE') as f:
 
 setup(
     name='QIP',
-    version='0.3.2',
+    version='0.3.4',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',
