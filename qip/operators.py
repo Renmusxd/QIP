@@ -187,8 +187,8 @@ class COp(MatrixOp):
     def make_op(self, op, inputs, nkwargs):
         return op(*inputs[1:], **nkwargs)
 
-    def makemats(self, qbitindex):
-        opm = self.op.makemats(qbitindex)
+    def makemats(self, index_groups):
+        opm = self.op.makemats(index_groups[1:])
         newdict = {}
         for indices in opm:
             newindices = tuple(flatten([index_groups[0], indices]))
