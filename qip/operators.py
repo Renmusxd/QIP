@@ -159,7 +159,7 @@ def C(op):
     remaining inputs as a normal op.
     """
     if hasattr(op, 'wrap_op_hook'):
-        return op.wrap_op_hook(COp)
+        return op.wrap_op_hook(COp) or QubitOpWrapper(COp, op)
     else:
         return QubitOpWrapper(COp, op)
 
