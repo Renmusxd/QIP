@@ -45,6 +45,9 @@ class QubitOpWrapper:
             return n.split()
         return n
 
+    def wrap_op_hook(self, opclass):
+        return None
+
 
 class NotOp(MatrixOp):
     def __init__(self, *inputs, **kwargs):
@@ -158,7 +161,7 @@ def C(op):
     :return: A Class C-Op which takes as a first input the controlling qubit and
     remaining inputs as a normal op.
     """
-    return QubitOpWrapper(COp, op)
+    return op.wrap_op_hook(COp) or QubitOpWrapper(COp, op)
 
 
 class COp(MatrixOp):
@@ -177,12 +180,15 @@ class COp(MatrixOp):
         nkwargs = kwargs.copy()
         nkwargs['nosink'] = True
         nkwargs['nosplit'] = True
-        self.op = op(*inputs[1:], **nkwargs)
+        self.op = self.make_op(op, inputs, nkwargs)
 
-        if not issubclass(type(self.op), MatrixOp) or issubclass(type(self.op), SwapMat):
+        if not issubclass(type(self.op), MatrixOp):
             raise ValueError("C(Op) may only be applied to matrix ops and swaps, not {}".format(type(self.op)))
 
         super().__init__(*inputs, qid=self.op.qid, **kwargs)
+
+    def make_op(self, op, inputs, nkwargs):
+        return op(*inputs[1:], **nkwargs)
 
     def makemats(self, qbitindex):
         opm = self.op.makemats(qbitindex)
