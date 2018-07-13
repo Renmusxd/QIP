@@ -1,5 +1,6 @@
 import numpy as np
-import cython
+cimport cython
+from cython cimport parallel
 cimport numpy as np
 cimport util
 from util cimport *
@@ -8,7 +9,7 @@ from util cimport *
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
-              double complex[:] vec, int n, double complex[:] output):
+              double complex[:] vec, int n, double complex[:] output, pregen=True):
     """
     Maps |x>|0> to |x>|func(x)> for |reg1>|reg2>
     Coefficients on all |x>|y!=0> must be |0>
@@ -18,6 +19,7 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
     :param vec: input state
     :param n: total number of qubits
     :param output: output state (will be overwritten).
+    :param pregen: True to pregenerate function output to speed up loop, good for reg1.n ~= reg2.n
     """
     if vec.shape[0] != output.shape[0] or 2**n != vec.shape[0]:
         raise ValueError("Both input and output vectors must be of size 2**n")
@@ -28,31 +30,44 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
     # Loop through |x> values, get |f(x)>, loop over all |r>
 
     # First zero the output to account for missed |y != f(x)> values
-    cdef int i
-    cdef int j
+    cdef:
+        int i
+        int j
+
     with nogil:
-        for i in range(2**n):
+        for i in parallel.prange(2**n, schedule='static'):
             output[i] = 0.0
 
-    cdef int x
-    cdef int y
-    cdef int r
-    cdef double complex tmp
-    cdef int vec_zero_index
-    cdef int vec_f_offset
-    cdef int vec_r_offset
-    cdef int n_remaining = n - (reg1_indices.shape[0] + reg2_indices.shape[0])
-    cdef int[:] other_indices = np.array([i for i in np.arange(0,n)
-                                          if (i not in reg1_indices and i not in reg2_indices)],
+    cdef:
+        int x
+        int y
+        int r
+        int c_pregen = int(pregen)
+        double complex tmp
+        int vec_zero_index
+        int vec_f_offset
+        int vec_r_offset
+        int n_remaining = n - (reg1_indices.shape[0] + reg2_indices.shape[0])
+        int[:] other_indices = np.array([i for i in np.arange(0,n)
+                                            if (i not in reg1_indices and i not in reg2_indices)],
                                          dtype=np.int32)
-    cdef int n_reg1 = reg1_indices.shape[0]
-    cdef int n_reg2 = reg2_indices.shape[0]
+        int n_reg1 = reg1_indices.shape[0]
+        int n_reg2 = reg2_indices.shape[0]
+        int[:] f_reg1 = np.zeros(shape=(1,), dtype=np.int32)  # Dummy value prevent unbound memory error from being raised.
+
+    if c_pregen:
+        f_reg1 = np.zeros(shape=(2**n_reg1,), dtype=np.int32)
+        for x in range(2**n_reg1):
+            f_reg1[x] = func(x)
 
     with nogil:
-        for x in range(2**n_reg1):
-            with gil:
-                # Will only use last n_reg2 bytes.
-                y = func(x)
+        for x in parallel.prange(2**n_reg1):
+            if c_pregen:
+                y = f_reg1[x]
+            else:
+                with gil:
+                    # Will only use last n_reg2 bytes.
+                    y = func(x)
 
             # Make base index |x>|0>
             # We are assuming that |x>|y!=0> is 0 for all the input.

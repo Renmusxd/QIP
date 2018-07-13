@@ -58,7 +58,7 @@ class CythonBackend(Backend):
         return kronselect_dot(mats, vec, n, outputarray, dot_impl=cdot_loop)
 
     def func_apply(self, reg1_indices, reg2_indices, func, vec, n, output):
-        return func_apply(reg1_indices, reg2_indices, func, vec, n, output)
+        return func_apply(reg1_indices, reg2_indices, func, vec, n, output, pregen=True)
 
     def measure(self, indices, n, vec, out, measured=None, measured_prob=None):
         return measure(indices, n, vec, out, measured=measured, measured_prob=measured_prob)

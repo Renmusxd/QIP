@@ -2,6 +2,7 @@
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 from setuptools.command.build_ext import build_ext
+from sys import platform
 import os
 
 try:
@@ -33,16 +34,20 @@ class CustomBuildExtCommand(build_ext):
 with open('LICENSE') as f:
     license = f.read()
 
+if platform.startswith('linux') or 'OPENMP' in os.environ:
+    print("="*10 + " Attempting install with OpenMP support " + "="*10)
+    has_openmp = True
+else:
+    print("="*10 + " OSX and Windows may not support OpenMP! Set the environment variable OPENMP to enable! " + "="*10)
+    has_openmp = False
+
 parallel_flags = ['-fopenmp']
-
-has_openmp = True
-
-extra_compile_flags = ["-O3", "-ffast-math", "-march=native"] + parallel_flags if has_openmp else []
+extra_compile_flags = ["-O3", "-ffast-math", "-march=native"] + (parallel_flags if has_openmp else [])
 extra_link_args = parallel_flags if has_openmp else []
 
 setup(
     name='QIP',
-    version='0.3.4',
+    version='0.3.5',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',
@@ -50,7 +55,7 @@ setup(
     author_email='sumnernh@gmail.com',
     url='https://github.com/Renmusxd/QIP',
     license=license,
-    packages=find_packages(exclude=('test','benchmark')),
+    packages=find_packages(exclude=('benchmark')),
     package_data={'': ['LICENSE', 'requirements.txt']},
     cmdclass={'build_ext': CustomBuildExtCommand},
     requires=['numpy', 'cython'],
@@ -58,7 +63,7 @@ setup(
     setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
     ext_modules=cythonize([Extension('qip.ext.*',
                            sources=['qip/ext/*.pyx'],
-                           # libraries=["m"],
+                           libraries=["m"],  # Allows dynamic linking of the math library on some Unix systems.
                            extra_compile_args=extra_compile_flags,
                            extra_link_args=extra_link_args)])
 )
