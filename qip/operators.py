@@ -158,7 +158,10 @@ def C(op):
     :return: A Class C-Op which takes as a first input the controlling qubit and
     remaining inputs as a normal op.
     """
-    return op.wrap_op_hook(COp) or QubitOpWrapper(COp, op)
+    if hasattr(op, 'wrap_op_hook'):
+        return op.wrap_op_hook(COp)
+    else:
+        return QubitOpWrapper(COp, op)
 
 
 class COp(MatrixOp):
