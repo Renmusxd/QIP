@@ -4,17 +4,23 @@ import numpy
 import collections
 
 
-def kronselect_dot(mats, vec, n, outputarray, dot_impl=None):
+def kronselect_dot(mats, vec, n, outputarray, input_offset=0, output_offset=0, dot_impl=None):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec
     for the case where most mj are identity.
     :param mats: { (indices,... #m) : mat(2**m x 2**m) }
     :param vec: vector v of size 2**n
     :param n: total number of matrices (including identities)
-    :param outputarray: array to store output in
+    :param outputarray: array in which to store output
+    :param dot_impl: implementation of cdot function to use, see dot_loop below for example.
+    :param input_offset: offset at which vec starts relative to possible larger context
+    :param output_offset: offset at which outputarray starts relative to possible larger context
     """
-    if len(vec) != 2**n:
-        raise Exception("Vec must be of length 2**n: {}:{}".format(len(vec), 2**n))
+    if len(vec) + input_offset > 2**n:
+        raise ValueError("Input vector size plus offset may be no larger than the total number of qubit states (2^n)")
+
+    if len(outputarray) + output_offset > 2**n:
+        raise ValueError("Output vector size plus offset may be no larger than the total number of qubit states (2^n)")
 
     newmats = {}
     for indices in mats:
@@ -46,32 +52,34 @@ def kronselect_dot(mats, vec, n, outputarray, dot_impl=None):
         cindices = numpy.array([numpy.array(x, dtype=numpy.int32) for x in iter_indices])
         cmats = numpy.array([newmats[x] if type(newmats[x]) != numpy.ndarray else newmats[x].astype(numpy.complex128)
                              for x in iter_indices])
-
-        dot_impl(cindices, cmats, vec, n, outputarray)
+        dot_impl(cindices, cmats, vec, n, outputarray, input_offset=input_offset, output_offset=output_offset)
     else:
-        # Sort all keys and make into tuples
-        dot_loop(newmats, vec, n, outputarray)
+        dot_loop(newmats, vec, n, outputarray, input_offset=input_offset, output_offset=output_offset)
 
 
-def dot_loop(mats, vec, n, output):
+def dot_loop(mats, vec, n, output, input_offset=0, output_offset=0):
     allindices = list(mats.keys())
     flatindices = list(sorted(set(index for indices in allindices for index in indices)))
 
-    for row in range(len(output)):
+    for outputrow in range(len(output)):
+        row = outputrow + output_offset
         s = 0
         for rowcol, mijs in gen_valid_col_and_matcol(row, flatindices, n):
             r, c = rowcol
+            input_col = c - input_offset
+            if input_col < 0 or input_col >= len(vec):
+                continue
+
             p = 1.0
             # Multiply required entries in each non-indentity matrix
             for indices in allindices:
                 mat = mats[indices]
                 submati = bitarray_to_uint([mijs[index][0] for index in indices])
                 submatj = bitarray_to_uint([mijs[index][1] for index in indices])
-
-                # print(tuple([row, c, submati, submatj, mat[submati, submatj]]))
                 p *= mat[submati, submatj]
-            s += p*vec[c]
-        output[row] = s
+
+            s += p*vec[input_col]
+        output[outputrow] = s
     return output
 
 
@@ -106,14 +114,15 @@ def gen_edit_indices(index_groups, maxindex):
             yield bitarray_to_uint(bits), qbit_state_indices
 
 
-def expand_kron_matrix(mats, n, cmode=False):
+def expand_kron_matrix(mats, n):
     m = numpy.zeros((2**n, 2**n), dtype=numpy.complex128)
     mats = {i: numpy.array(mats[i], dtype=numpy.complex128) for i in mats}
     for i in range(2**n):
         v = numpy.zeros((2**n,), dtype=numpy.complex128)
         v[i] = 1.0
-        kronselect_dot(mats, v, n, m[i, :], cmode=cmode)
+        kronselect_dot(mats, v, n, m[i, :])
     return m
+
 
 def uint_to_bitarray(num, n):
     bits = []

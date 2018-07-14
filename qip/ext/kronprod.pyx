@@ -40,11 +40,14 @@ def count_extra_mats(mat):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def cdot_loop(int[:,:] indexgroups, matrices,
-              double complex[:] vec, int n, double complex[:] output):
-    # Check types
-    if vec.shape[0] != output.shape[0] or 2**n != vec.shape[0]:
-        raise ValueError("Both input and output vectors must be of size 2**n")
-
+              double complex[:] vec, int n, double complex[:] output,
+              int input_offset = 0, int output_offset = 0):
+    """
+    Efficiently compute the matrix multiplication of the matrix given by kron-product of the matrices each representing
+    the indices in indexgroups with the vector in vec. Output is saved in output. input_offset and output_offset are
+    used to compute subsections of the matrix multiplication by assuming vec[i] represents vec[i+offset] and similarly
+    output[i] is output[i+offset].
+    """
     # Get number of matrices including nested cmats
     cdef int n_extra_mats = 0
     for mat in matrices:
@@ -135,8 +138,8 @@ def cdot_loop(int[:,:] indexgroups, matrices,
         long[:] indexgroupsizes = np.array([indexgroups[i].shape[0] for i in range(nindexgroups)], dtype=np.int)
         int[:] flatindices = np.array(list(sorted(set(index for indices in indexgroups for index in indices))),
                                            dtype=np.int32)
-
-        int two_n = 2**n
+        int input_len = len(vec)
+        int output_len = len(output)
         int nindices = len(flatindices)
         int two_nindices = 2**nindices
         int indx
@@ -145,14 +148,16 @@ def cdot_loop(int[:,:] indexgroups, matrices,
         int submatj
         int matindex
         int len_indexgroup
-        int row, j, indexgroupindex, matindexindex
+        int outputrow, row, vecrow, j, indexgroupindex, matindexindex
 
     # Entry the main loop.
     with nogil:
         # Build each entry in output.
-        for row in parallel.prange(two_n, schedule='static'):
-            s = 0.0
+        for outputrow in parallel.prange(output_len, schedule='static'):
+            row = outputrow + output_offset
             colbits = row
+            # Output accumulator
+            s = 0.0
 
             # Generate valid columns and calculate required bitflips
             for i in range(two_nindices):
@@ -162,8 +167,12 @@ def cdot_loop(int[:,:] indexgroups, matrices,
                     # colbits[indx] = matcol[j]
                     colbits = set_bit(colbits, (n-1) - indx, get_bit(i, (nindices-1)-j))
 
-                p = 1.0
+                vecrow = colbits - input_offset
+                if vecrow < 0 or vecrow >= input_len:
+                    continue
+
                 # Get entry in kron-matrix by multiplying relevant sub-matrices
+                p = 1.0
                 for indexgroupindex in range(nindexgroups):
                     len_indexgroup = indexgroupsizes[indexgroupindex]
                     mstruct = cmatrices[indexgroupindex]
@@ -184,8 +193,8 @@ def cdot_loop(int[:,:] indexgroups, matrices,
                     if p == 0.0:
                         break
 
-                s = s + (p*vec[colbits])
-            output[row] = s
+                s = s + (p*vec[vecrow])
+            output[outputrow] = s
 
     # Finally.
     free(cmatrices)
