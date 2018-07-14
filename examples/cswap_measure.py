@@ -7,7 +7,7 @@ q2 = Qubit(n=3)
 q3 = Qubit(n=3)
 
 h1 = H(q1)
-c1, c2, c3 = C(SwapOp)(h1, q2, q3)
+c1, c2, c3 = C(Swap)(h1, q2, q3)
 m1 = H(c1)
 
 # Make example circuit diagram

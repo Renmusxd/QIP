@@ -65,6 +65,65 @@ class TestQubitMethods(unittest.TestCase):
             self.assertTrue(numpy.array_equal(expect, test2))
             self.assertTrue(numpy.array_equal(expect, test3))
 
+    def test_simple_kron_output_offset(self):
+        i = numpy.array([[1, 0], [0, 1]])
+        h = numpy.array([[1, 1], [1, -1]])
+        hh = numpy.kron(h, h)
+
+        ref = numpy.kron(h, numpy.kron(i, h))
+
+        for i in range(ref.shape[0]):
+            # Normal input
+            inputtest = numpy.zeros(shape=ref.shape[0], dtype=numpy.complex128)
+            inputtest[i] = 1
+            expect = ref[:,i]
+            # kronselect_dot({0: h, 2: h}, inputtest, 3, test1)
+
+            # Offset output
+            for output_offset in range(int(ref.shape[0]/2)):
+                test1 = numpy.zeros(shape=(int(ref.shape[0]/2),), dtype=numpy.complex128)
+                test2 = numpy.array(test1, dtype=numpy.complex128)
+                kronselect_dot({0: h, 2: h}, inputtest, 3, test1, output_offset=output_offset)
+                kronselect_dot({(0,2): hh}, inputtest, 3, test2, output_offset=output_offset)
+
+                self.assertTrue(numpy.array_equal(expect[output_offset:output_offset+int(ref.shape[0]/2)],
+                                                  test1))
+                self.assertTrue(numpy.array_equal(expect[output_offset:output_offset + int(ref.shape[0] / 2)],
+                                                  test2))
+
+    def test_simple_kron_input_offset(self):
+        i = numpy.array([[1, 0], [0, 1]])
+        h = numpy.array([[1, 1], [1, -1]])
+        hh = numpy.kron(h, h)
+
+        ref = numpy.kron(h, numpy.kron(i, h))
+
+        for i in range(ref.shape[0]):
+            # Normal input
+            inputtest = numpy.zeros(shape=ref.shape[0], dtype=numpy.complex128)
+            inputtest[i] = 1
+            expect = ref[:,i]
+            # kronselect_dot({0: h, 2: h}, inputtest, 3, test1)
+
+            # Offset input
+            test1 = numpy.zeros(shape=(ref.shape[0],), dtype=numpy.complex128)
+            test2 = numpy.array(test1, dtype=numpy.complex128)
+
+            step = int(ref.shape[0]/4)
+            for input_offset in range(0,ref.shape[0],step):
+                test_tmp = numpy.zeros(shape=(ref.shape[0],), dtype=numpy.complex128)
+                kronselect_dot({0: h, 2: h}, inputtest[input_offset:input_offset+step], 3, test_tmp,
+                               input_offset=input_offset)
+                test1 = test1 + test_tmp
+
+                test_tmp = test_tmp * 0
+                kronselect_dot({(0,2): hh}, inputtest[input_offset:input_offset + step], 3, test_tmp,
+                               input_offset=input_offset)
+                test2 = test2 + test_tmp
+
+            self.assertTrue(numpy.array_equal(expect, test1))
+            self.assertTrue(numpy.array_equal(expect, test2))
+
     def test_func_apply(self):
         xs = numpy.array([0,1], dtype=numpy.int32)
         ys = numpy.array([2,3], dtype=numpy.int32)
@@ -92,7 +151,6 @@ class TestQubitMethods(unittest.TestCase):
         self.assertEqual(output[6], 3)
         # |3>|0>
         self.assertEqual(output[12], 4)
-
 
 if __name__ == '__main__':
     unittest.main()

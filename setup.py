@@ -39,6 +39,7 @@ if platform.startswith('linux') or 'OPENMP' in os.environ:
     has_openmp = True
 else:
     print("="*10 + " OSX and Windows may not support OpenMP! Set the environment variable OPENMP to enable! " + "="*10)
+    print("="*10 + " plus use the CC environment variable to set the preferred compiler (i.e. gcc for osx)  " + "="*10)
     has_openmp = False
 
 parallel_flags = ['-fopenmp']
@@ -47,7 +48,7 @@ extra_link_args = parallel_flags if has_openmp else []
 
 setup(
     name='QIP',
-    version='0.3.5',
+    version='0.3.6',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',

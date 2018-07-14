@@ -1,5 +1,5 @@
 from qip.qip import Qubit
-from qip.operators import H, C, Rm, Swap
+from qip.operators import H, C, Rm, Swap, QubitOpWrapper
 from qip.util import flatten
 
 
@@ -31,7 +31,8 @@ def recQFFT(qarr, offset=0):
     if len(qarr) > offset:
         qarr[offset] = H(qarr[offset])
         for i in range(offset+1, len(qarr)):
-            qarr[i], qarr[offset] = C(makeR(1 + i - offset))(qarr[i], qarr[offset])
+            m = 1 + i - offset
+            qarr[i], qarr[offset] = C(makeR(m))(qarr[i], qarr[offset])
         recQFFT(qarr, offset + 1)
 
 

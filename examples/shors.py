@@ -24,7 +24,7 @@ def classical(N):
         print("\tgcd({},{})={}".format(a,N,gcd))
         if gcd != 1:
             print("gcd != 1 --> Factor found!")
-            return a
+            return gcd, int(N/gcd)
         print("Step 3: Find period r")
         r = quantum(a, N)
         print("\tr={}".format(r))
@@ -48,8 +48,9 @@ def quantum(x, N):
     n_qubits = int(numpy.ceil(numpy.log2(N)))
     # m_qubits = int(numpy.ceil(numpy.log2(x)))
 
+    max_iters = 10
     r = 1
-    while r == 1:
+    while r == 1 and max_iters > 0:
         stochastic_output, m = make_circuit(q_qubits, n_qubits, x, N)
         o, c = run(m)
         peak = c[m][0]
@@ -65,6 +66,7 @@ def quantum(x, N):
                 break
 
         print("\tx={} \tr={}".format(x,r))
+        max_iters -= 1
     return r
 
 

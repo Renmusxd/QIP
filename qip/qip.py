@@ -94,8 +94,10 @@ class Qubit(PipelineObject):
             n = sum(q.n for q in inputs)
         if type(default)==list and len(default) != 2**n:
             raise ValueError("Default state length must be 2**n")
+        if n <= 0:
+            raise Exception("Number of qubits must be greater than 0")
+
         self.n = n
-        self.check()
         if qid is None:
             qid = Qubit.QID
             Qubit.QID += 1
@@ -149,9 +151,12 @@ class Qubit(PipelineObject):
         qs = SplitQubit([i for i in range(self.n) if i not in indices and 0 <= i < self.n], self, qid=sq.qid)
         return sq, qs
 
-    def check(self):
-        if self.n <= 0:
-            raise Exception("Number of qubits must be greater than 0")
+    def wrap_op_hook(self, opclass):
+        """
+        Hook for overriding default Cop behaviour in order to allow them to operate on non-MatrixOp/SwapMat classes.
+        :return:
+        """
+        return None
 
     def __repr__(self):
         return "Q({})".format(self.qid)
