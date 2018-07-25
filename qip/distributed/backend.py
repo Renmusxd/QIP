@@ -1,10 +1,14 @@
 from qip.backend import Backend
-from qip.distributed.messages import ManagerCommand, ManagerReply
+import numpy
+from qip.distributed.messages import StateSetup
 
 
 class DistributedBackend(Backend):
     def __init__(self, n):
         super().__init__(n)
+
+    def make_state(self, index_groups, feed_list, state=None, startindex=None, endindex=None, statetype=numpy.complex128):
+        pass
 
     def kronselect_dot(self, mats, vec, n, outputarray):
         raise NotImplemented("kronselect_dot not implemented by base class")

@@ -9,7 +9,8 @@ from util cimport *
 @cython.wraparound(False)
 @cython.boundscheck(False)
 def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
-              double complex[:] vec, int n, double complex[:] output, pregen=True):
+               double complex[:] vec, int n, double complex[:] output,
+               int input_offset=0, int output_offset=0, pregen=True):
     """
     Maps |x>|0> to |x>|func(x)> for |reg1>|reg2>
     Coefficients on all |x>|y!=0> must be |0>
@@ -19,11 +20,16 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
     :param vec: input state
     :param n: total number of qubits
     :param output: output state (will be overwritten).
+    :param input_offset: offset at which input vec starts
+    :param output_offset: offset at which output vec starts
     :param pregen: True to pregenerate function output to speed up loop, good for reg1.n ~= reg2.n
     """
     if vec.shape[0] != output.shape[0] or 2**n != vec.shape[0]:
         raise ValueError("Both input and output vectors must be of size 2**n")
-
+    if len(vec) + input_offset > 2**n:
+        raise ValueError("Input vector size plus offset may be no larger than the total number of qubit states (2^n)")
+    if len(output) + output_offset > 2**n:
+        raise ValueError("Output vector size plus offset may be no larger than the total number of qubit states (2^n)")
     # Plan:
     # define |psi> = |x>|y>|r> where |r> is the state of qubits not in reg1 or reg2
     # Iterate through all |x>|0>|r> and copy value over to |x>|f(x)>|r>
@@ -54,6 +60,10 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
         int n_reg1 = reg1_indices.shape[0]
         int n_reg2 = reg2_indices.shape[0]
         int[:] f_reg1 = np.zeros(shape=(1,), dtype=np.int32)  # Dummy value prevent unbound memory error from being raised.
+        int input_index, output_index
+        int ninput = vec.shape[0]
+        int noutput = output.shape[0]
+
 
     if c_pregen:
         f_reg1 = np.zeros(shape=(2**n_reg1,), dtype=np.int32)
@@ -91,4 +101,7 @@ def func_apply(int[:] reg1_indices, int[:] reg2_indices, func,
                 for j in range(reg2_indices.shape[0]):
                     vec_r_offset = set_bit(vec_r_offset, (n-1) - other_indices[j],
                                            get_bit(r, (n_remaining-1) - j))
-                output[vec_zero_index | vec_f_offset | vec_r_offset] = vec[vec_zero_index | vec_r_offset]
+                input_index = (vec_zero_index | vec_r_offset) - input_offset
+                output_index = (vec_zero_index | vec_f_offset | vec_r_offset) - output_offset
+                if 0 <= input_index < ninput and 0 <= output_index < noutput:
+                    output[output_index] = vec[input_index]

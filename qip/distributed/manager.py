@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+from qip.distributed.messages import WorkerSetup
 from qip.distributed import formatsock
 from threading import Thread, Lock, Condition
 from threading import Lock
@@ -47,7 +48,7 @@ class Manager:
                 for connection in rs:
                     host_socket = connection.socket
                     host_info = connection.info
-
+                    # TODO
 
             else:
                 time.sleep(Manager.INPUT_TIMEOUT)
