@@ -3,7 +3,6 @@ from setuptools import setup, find_packages
 from distutils.extension import Extension
 from setuptools.command.build_ext import build_ext
 from sys import platform
-import sys
 import glob
 import os
 
