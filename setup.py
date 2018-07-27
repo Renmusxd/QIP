@@ -18,9 +18,6 @@ class CustomBuildExtCommand(build_ext):
         build_ext.run(self)
 
 
-with open('LICENSE') as f:
-    license = f.read()
-
 if platform.startswith('linux') or 'OPENMP' in os.environ:
     print("="*10 + " Attempting install with OpenMP support " + "="*10)
     has_openmp = True
@@ -56,16 +53,15 @@ else:
 
 setup(
     name='QIP',
-    version='0.3.6',
+    version='0.3.7',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',
     author='Sumner Hearth',
     author_email='sumnernh@gmail.com',
     url='https://github.com/Renmusxd/QIP',
-    license=license,
+    license='MIT',
     packages=find_packages(exclude=('tests','benchmark')),
-    package_data={'': ['LICENSE', 'requirements.txt']},
     cmdclass={'build_ext': CustomBuildExtCommand},
     requires=['numpy'],
     install_requires=['numpy'],
