@@ -35,6 +35,7 @@ if USE_CYTHON:
     try:
         from Cython.Build import cythonize
         print("Cythonizing source files...")
+        # Cython handles creating extensions
         extensions = cythonize([Extension('qip.ext.*',
                                sources=['qip/ext/*.pyx'],
                                libraries=["m"],  # Allows dynamic linking of the math library on some Unix systems.
@@ -45,15 +46,18 @@ if USE_CYTHON:
         raise e
 else:
     print("Not cythonizing c files. To cythonize install cython and set CYTHON env variable")
-    extensions = [Extension('qip.ext.*',
-                            sources=glob.glob('qip/ext/*.c'),
+    # Make each of the c file extensions
+    EXT = '.c'
+    extensions = [Extension('qip.ext.{}'.format(os.path.basename(filename)[:-len(EXT)]),
+                            sources=[filename],
                             libraries=["m"],  # Allows dynamic linking of the math library on some Unix systems.
                             extra_compile_args=extra_compile_flags,
-                            extra_link_args=extra_link_args)]
+                            extra_link_args=extra_link_args)
+                  for filename in glob.glob('qip/ext/*'+EXT)]
 
 setup(
     name='QIP',
-    version='0.3.7',
+    version='0.3.8',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',

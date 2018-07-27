@@ -1,0 +1,3 @@
+include qip/ext/*.pxd
+include qip/ext/*.pyx
+include qip/ext/*.c
