@@ -2,22 +2,10 @@
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 from setuptools.command.build_ext import build_ext
+import sys
 from sys import platform
+import glob
 import os
-
-try:
-    from Cython.Build import cythonize
-except ImportError:
-    # I can't find a nicer way to do this. Pull requests graciously accepted.
-
-    # Make fake cythonize call for use now, Extensions will fail and restart
-    # due to setup_requires call.
-    def cythonize(module_list):
-        return module_list
-    print("==============================================================\n"
-          "| Cython not available, compilation will fail and restart    |\n"
-          "| after installing cython.                                   |\n"
-          "==============================================================")
 
 
 # Delay import of numpy until after it has been installed. Same doesn't quite
@@ -46,6 +34,27 @@ parallel_flags = ['-fopenmp']
 extra_compile_flags = ["-O3", "-ffast-math", "-march=native"] + (parallel_flags if has_openmp else [])
 extra_link_args = parallel_flags if has_openmp else []
 
+USE_CYTHON = "CYTHON" in os.environ
+if USE_CYTHON:
+    try:
+        from Cython.Build import cythonize
+        print("Cythonizing source files...")
+        extensions = cythonize([Extension('qip.ext.*',
+                               sources=['qip/ext/*.pyx'],
+                               libraries=["m"],  # Allows dynamic linking of the math library on some Unix systems.
+                               extra_compile_args=extra_compile_flags,
+                               extra_link_args=extra_link_args)])
+    except ImportError as e:
+        print("Cython not installed, please install cython and try again")
+        raise e
+else:
+    print("Not cythonizing c files. To cythonize install cython and set CYTHON env variable")
+    extensions = [Extension('qip.ext.*',
+                            sources=glob.glob('qip/ext/*.c'),
+                            libraries=["m"],  # Allows dynamic linking of the math library on some Unix systems.
+                            extra_compile_args=extra_compile_flags,
+                            extra_link_args=extra_link_args)]
+
 setup(
     name='QIP',
     version='0.3.6',
@@ -56,15 +65,11 @@ setup(
     author_email='sumnernh@gmail.com',
     url='https://github.com/Renmusxd/QIP',
     license=license,
-    packages=find_packages(exclude=('benchmark')),
+    packages=find_packages(exclude=('tests','benchmark')),
     package_data={'': ['LICENSE', 'requirements.txt']},
     cmdclass={'build_ext': CustomBuildExtCommand},
-    requires=['numpy', 'cython'],
-    install_requires=['numpy', 'cython'],
-    setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
-    ext_modules=cythonize([Extension('qip.ext.*',
-                           sources=['qip/ext/*.pyx'],
-                           libraries=["m"],  # Allows dynamic linking of the math library on some Unix systems.
-                           extra_compile_args=extra_compile_flags,
-                           extra_link_args=extra_link_args)])
+    requires=['numpy'],
+    install_requires=['numpy'],
+    setup_requires=['numpy'],
+    ext_modules=extensions
 )
