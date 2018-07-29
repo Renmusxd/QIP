@@ -57,7 +57,7 @@ else:
 
 setup(
     name='QIP',
-    version='0.3.8',
+    version='0.3.9',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',
