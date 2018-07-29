@@ -9,12 +9,20 @@ except ImportError:
     pyplot = False
 
 
+def graph(measure):
+    if pyplot:
+        pyplot.plot(measure, label='ds')
+        pyplot.ylim([0, 1])
+        pyplot.legend()
+        pyplot.show()
+
+
 def Uw(search, ancillary, x0):
-    return F(lambda x: int(x==x0), search, ancillary)
+    return F(lambda x: int(x == x0), search, ancillary)
 
 
 def Us(search, ancillary):
-    f_s, f_anc = F(lambda x: int(x==0), H(search), ancillary)
+    f_s, f_anc = Uw(H(search), ancillary, 0)
     return H(f_s), f_anc
 
 
@@ -35,19 +43,11 @@ make_svg(sm_ds, filename='grovers.svg')
 
 state, c = run(sm_ds, sm_da)
 
-if pyplot:
-    pyplot.plot(c[sm_ds], label='ds')
-    pyplot.ylim([0, 1])
-    pyplot.legend()
-    pyplot.show()
+graph(c[sm_ds])
 
 # At each iteration of grovers feed the state from the last iteration, as though it were one long circuit.
-for i in range(int(2 ** (n / 2))):
+for i in range(int(2 ** (n / 2)) - 1):
     state, c = run(sm_ds, sm_da, state=state)
-    if pyplot:
-        pyplot.plot(c[sm_ds], label='ds')
-        pyplot.ylim([0, 1])
-        pyplot.legend()
-        pyplot.show()
+    graph(c[sm_ds])
 
 print(numpy.argmax(c[sm_ds]))
