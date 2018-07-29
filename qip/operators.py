@@ -227,7 +227,16 @@ class CMat(object):
 
 
 class FOp(Qubit):
+    """
+    Operation to apply function to circuit. takes a function f and two registers: maps |x>|q> values to |x>|f(x)^q>
+    """
     def __init__(self, func, reg1, reg2, **kwargs):
+        """
+        Constructs FOp operator.
+        :param func: function to apply to circuit
+        :param reg1: register to take as input to function
+        :param reg2: register to "store output", index xor'ed against function output.
+        """
         super().__init__(reg1, reg2, **kwargs)
         self.func = func
         self.reg1 = reg1

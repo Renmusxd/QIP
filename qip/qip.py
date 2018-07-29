@@ -86,12 +86,15 @@ class Qubit(PipelineObject):
         """
         Create a qubit object
         :param inputs: inputs to qubit, qubit acts as identity on each
-        :param n: number of qubits this object represents, set by inputs if given
+        :param n: number of qubits this object represents, set by inputs if inputs given, if not then 1.
         :param qid: forces qid value. For internal use or cloning.
         """
         super().__init__(quantum, default=default)
         if n is None:
-            n = sum(q.n for q in inputs)
+            if len(inputs) > 0:
+                n = sum(q.n for q in inputs)
+            else:
+                n = 1
         if type(default)==list and len(default) != 2**n:
             raise ValueError("Default state length must be 2**n")
         if n <= 0:
