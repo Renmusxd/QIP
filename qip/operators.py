@@ -1,7 +1,6 @@
 from qip.qip import Qubit
-from qip.util import kronselect_dot
+from qip.util import QubitOpWrapper
 from qip.util import flatten
-from qip.ext.func_apply import func_apply
 import numpy
 
 
@@ -23,27 +22,6 @@ class MatrixOp(Qubit):
         :return: dict from index groups to matrix
         """
         raise NotImplemented("This method should never be called.")
-
-
-class QubitOpWrapper:
-    """
-    Class which wraps normal ops and allows them to split output upon call.
-    """
-    def __init__(self, op, *args, **kwargs):
-        self.op = op
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self, *inputs, nosplit=False, **kwargs):
-        kwargs = self.kwargs.copy()
-        kwargs.update(kwargs)
-        n = self.op(*self.args, *inputs, **kwargs)
-        if len(n.inputs) > 1 and not nosplit:
-            return n.split()
-        return n
-
-    def wrap_op_hook(self, opclass):
-        return None
 
 
 class NotOp(MatrixOp):
@@ -159,7 +137,7 @@ def C(op):
     remaining inputs as a normal op.
     """
     if hasattr(op, 'wrap_op_hook'):
-        return op.wrap_op_hook(COp) or QubitOpWrapper(COp, op)
+        return op.wrap_op_hook(COp, consumed_inputs=[0]) or QubitOpWrapper(COp, op)
     else:
         return QubitOpWrapper(COp, op)
 

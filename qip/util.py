@@ -4,6 +4,101 @@ import numpy
 import collections
 
 
+class QubitWrapperContext:
+    CONTEXT_STACK = []
+
+    def __init__(self, *args):
+        """
+        Makes a new qubit wrapper context. Within it all calls to QubitOpWrapper made constructors will automatically
+        apply op wrappers added via this context.
+        :param args: args is a series of triples/doubles qubits for control, and indices those qubits
+        should be placed at. If indices not included then defaults to first n where n is number of qubits.
+        """
+        self.context = []
+        buff = []
+        for arg in args:
+            if type(arg) == tuple or type(arg) == list:
+                buff.append(arg)
+            else:
+                if len(buff) > 0:
+                    self.add_context(*buff)
+                    buff = []
+                buff.append(arg)
+        if len(buff) > 0:
+            self.add_context(*buff)
+
+    def add_context(self, constructor, qubits, indices=None):
+        if indices is not None:
+            self.context.append((constructor, qubits, indices))
+        else:
+            self.context.append((constructor, qubits, list(range(len(qubits)))))
+
+    def get_context_qubits(self):
+        pass
+
+
+    @staticmethod
+    def get_context():
+        return flatten(QubitWrapperContext.CONTEXT_STACK)
+
+    def __enter__(self):
+        QubitWrapperContext.CONTEXT_STACK.append(self.context)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        QubitWrapperContext.CONTEXT_STACK.pop()
+
+
+class QubitOpWrapper:
+    """
+    Class which wraps normal ops and allows them to split output upon call.
+    """
+    def __init__(self, op, *args, **kwargs):
+        self.op = op
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, *inputs, nosplit=False, **kwargs):
+        kwargs = self.kwargs.copy()
+        kwargs.update(kwargs)
+        # TODO get the QubitWrapperContext and build new self.op
+
+        n = self.op(*self.args, *inputs, **kwargs)
+        if len(n.inputs) > 1 and not nosplit:
+            return n.split()
+        return n
+
+    def wrap_op_hook(self, opconstructor, consumed_inputs=None):
+        return None
+
+
+class QubitFuncWrapper:
+    def __init__(self, func):
+        self.func = func
+        self.wrapper_funcs = []
+
+    def __call__(self, *inputs, **kwargs):
+        # Extract consumed ops in reverse order
+        input_list = list(inputs)
+        ops_and_qubits = []
+        for opconstructor, consumed_indices in reversed(self.wrapper_funcs):
+            # Remove in reverse order to preserve index values.
+            consumed_qubits = reversed([input_list.pop(i) for i in reversed(consumed_indices)])
+            ops_and_qubits.append((opconstructor, consumed_qubits, consumed_indices))
+        ops_and_qubits = reversed(ops_and_qubits)
+
+        # Qubits left in input_list are destined to go to circuit func
+        # Use func to construct the circuit from args
+        with QubitWrapperContext(*flatten(ops_and_qubits)) as context:
+            outputs = self.func(input_list)
+
+
+        pass
+
+    def wrap_op_hook(self, opconstructor, consumed_inputs=None):
+        self.wrapper_funcs.append((opconstructor,consumed_inputs))
+        return self
+
+
 def kronselect_dot(mats, vec, n, outputarray, input_offset=0, output_offset=0, dot_impl=None):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec

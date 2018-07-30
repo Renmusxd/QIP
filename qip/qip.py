@@ -154,9 +154,11 @@ class Qubit(PipelineObject):
         qs = SplitQubit([i for i in range(self.n) if i not in indices and 0 <= i < self.n], self, qid=sq.qid)
         return sq, qs
 
-    def wrap_op_hook(self, opclass):
+    def wrap_op_hook(self, opconstructor, consumed_inputs=None):
         """
         Hook for overriding default Cop behaviour in order to allow them to operate on non-MatrixOp/SwapMat classes.
+        :param opconstructor: function to call to construct the operation
+        :param consumed_inputs: a list of indicies of inputs which should not be passed to wrapped op, only wrapper.
         :return:
         """
         return None
