@@ -6,6 +6,7 @@ from qip.util import kronselect_dot
 from qip.util import gen_edit_indices
 from qip.util import flatten
 import numpy
+from typing import Union, List
 
 
 class Backend:
@@ -23,6 +24,14 @@ class Backend:
 
     def measure_probabilities(self, indices, n, vec):
         raise NotImplemented("measure_probabilities not implemented by base class")
+
+
+class StateType:
+    def __init__(self, state):
+        self.state = state
+
+    def get_state(self):
+        return self.state
 
 
 class CythonBackend(Backend):

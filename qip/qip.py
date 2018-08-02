@@ -1,48 +1,60 @@
 from qip.pipeline import run
-from qip.ext.kronprod import measure, measure_probabilities
 from qip.util import flatten
+from qip.backend import StateType, Backend
 import numpy
+from typing import List, Dict, Tuple, Type, Callable, Union, Optional
+
+InitialState = Union[List[int], Tuple[int], int]
+
+class OpConstructor:
+    def __init__(self, op):
+        self.op = op
+
+    def __call__(self, *args, **kwargs) -> 'Qubit':
+        return self.op(*args, **kwargs)
+
+    def wrap_op_hook(self, opconstructor, consumed_inputs=None) -> Optional['Qubit']:
+        return None
 
 
 class PipelineObject(object):
-    def __init__(self, quantum, default=None):
+    def __init__(self, quantum: bool, default: InitialState = None):
         self.quantum = quantum
         self.inputs = []
         self.sink = []
         self.default = default
 
-    def run(self, state=None, feed=None, **kwargs):
+    def run(self, state: InitialState =None, feed: Dict['PipelineObject', InitialState] = None, **kwargs):
         return run(self, state=state, feed=feed, **kwargs)
 
-    def feed(self, inputvals, qbitindex, n, arena, backend):
+    def feed(self, inputvals: StateType, qbitindex: Dict['PipelineObject', List[int]], n: int, arena: StateType,
+             backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
         """
         Operate on the state of the system.
-        :param inputvals: 2**n complex values
+        :param inputvals: input state
         :param qbitindex: mapping of qbit to global index
         :param n: number of qubits
-        :param arena: memory arena to use for computations, must be of size 2**n
+        :param arena: memory arena to use for computations
         :param backend: backend to use for matrix operations
-        :return: (2**n complex values of applying Q to input, memory arena of size 2**n, (num classic bits, int bits))
+        :return: (state, state_arena, (num classic bits, int bits))
         """
         return self.feed_indices(inputvals, [qbitindex[q] for q in self.inputs], n, arena, backend)
 
-    def feed_indices(self, inputvals, index_groups, n, arena, backend):
+    def feed_indices(self, inputvals: StateType, index_groups: List[List[int]], n: int, arena: StateType,
+                     backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
         """
         Operate on the state of the system.
-        :param inputvals: 2**n complex values
+        :param inputvals: state
         :param index_groups: array of arrays of indicies used by each input in order.
         :param n: number of qubits
-        :param arena: memory arena to use for computations, must be of size 2**n
+        :param arena: arena for state
         :param backend: backend to use for matrix operations
-        :return: (2**n complex values of applying Q to input, memory arena of size 2**n, (num classic bits, int bits))
+        :return: (state, state_arena, (num classic bits, int bits))
         """
-        # Check to make sure enough are given
-        if len(inputvals) != 2 ** n:
-            raise Exception("Incorrect #inputs given: {} versus expected {}".format(len(inputvals), 2 ** n))
         # Return identity
-        return inputvals, arena, (0, None)
+        return inputvals, arena, (0, 0)
 
-    def select_index(self, indices):
+    def select_index(self, indices: List[int]) -> List[int]:
         """
         May be overridden to modify index selection (see SplitQubit).
         :param indices: list of indices from all inputs nodes
@@ -50,7 +62,7 @@ class PipelineObject(object):
         """
         return indices
 
-    def remap_index(self, index_map, n):
+    def remap_index(self, index_map: Dict['PipelineObject', int], n: int) -> Dict['PipelineObject', int]:
         """
         May be override to rearrange qubits if needed
         :param index_map: map of Qubit -> Index
@@ -59,16 +71,16 @@ class PipelineObject(object):
         """
         return index_map
 
-    def set_sink(self, sink):
+    def set_sink(self, sink: 'Qubit'):
         if type(sink) != Qubit or (len(self.sink) == 0 or self.sink[0].qid == sink.qid):
             self.sink += [sink]
         else:
             raise Exception("Qubits may only sink to one output (no cloning)")
 
-    def get_inputs(self):
+    def get_inputs(self) -> List['PipelineObject']:
         return self.inputs
 
-    def apply(self, op):
+    def apply(self, op: OpConstructor) -> 'Qubit':
         return op(self)
 
     def __hash__(self):
@@ -154,17 +166,11 @@ class Qubit(PipelineObject):
         qs = SplitQubit([i for i in range(self.n) if i not in indices and 0 <= i < self.n], self, qid=sq.qid)
         return sq, qs
 
-    # def wrap_op_hook(self, opconstructor, consumed_inputs=None):
-    #     """
-    #     Hook for overriding default Cop behaviour in order to allow them to operate on non-MatrixOp/SwapMat classes.
-    #     :param opconstructor: function to call to construct the operation
-    #     :param consumed_inputs: a list of indicies of inputs which should not be passed to wrapped op, only wrapper.
-    #     :return:
-    #     """
-    #     return None
-
     def __repr__(self):
         return "Q({})".format(self.qid)
+
+
+Q = OpConstructor(Qubit)
 
 
 class SplitQubit(Qubit):
