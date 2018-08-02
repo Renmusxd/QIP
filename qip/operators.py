@@ -44,7 +44,6 @@ class HOp(MatrixOp):
         super().__init__(*inputs, **kwargs)
 
     def makemats(self, index_groups):
-        # TODO: fix so that H(multiple qubits) meets the standard and isn't just H on each.
         return {i: (1/numpy.sqrt(2))*numpy.array([[1, 1], [1, -1]])
                 for i in flatten(index_groups)}
 
@@ -137,7 +136,7 @@ def C(op):
     remaining inputs as a normal op.
     """
     if hasattr(op, 'wrap_op_hook'):
-        return op.wrap_op_hook(COp, consumed_inputs=[0]) or QubitOpWrapper(COp, op)
+        return op.wrap_op_hook(C, consumed_inputs=[0]) or QubitOpWrapper(COp, op)
     else:
         return QubitOpWrapper(COp, op)
 
