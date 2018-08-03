@@ -144,21 +144,9 @@ class Measure(Qubit):
 
     def feed_indices(self, inputvals: StateType, index_groups: Sequence[Sequence[int]], n: int, arena: StateType,
                      backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
-        # TODO reimplement with a state agnostic backend
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        bits = backend.measure(indices, n, inputvals, arena)
-
-        # Cut and kill old memory after measurement so that footprint never grows above original.
-        tmp_size = inputvals.shape[0]
-        tmp_dtype = inputvals.dtype
-        del inputvals
-
-        new_inputvals = numpy.ndarray(shape=(tmp_size >> self.n), dtype=tmp_dtype)
-
-        # Copy out relevant area from old arena
-        new_arena = arena[:arena.shape[0] >> self.n]
-        del arena
+        new_arena, new_inputvals, bits = backend.measure(indices, n, inputvals, arena)
 
         return new_arena, new_inputvals, (self.n, bits)
 

@@ -238,7 +238,7 @@ def feed_forward(frontier: Sequence[PipelineObject], state: StateType, arena: St
     n = sum(f.n for f in frontier)
     graphacc = NodeFeeder(state, arena, n, backend)
     run_graph(frontier, graphnodes, graphacc)
-    return graphacc.state, graphacc.classic_map
+    return graphacc.state.state, graphacc.classic_map
 
 
 class PrintFeeder(GraphAccumulator):
