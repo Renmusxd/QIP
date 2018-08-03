@@ -175,7 +175,7 @@ class QubitFuncWrapper(OpConstructor):
         super().__init__(func)
         self.wrapper_funcs = []
 
-    def __call__(self, *inputs: Qubit, **kwargs):
+    def __call__(self, *inputs: Qubit, **kwargs) -> Union[Qubit, Tuple[Qubit, ...]]:
         # Extract consumed ops in reverse order
         input_list = list(inputs)
         ops_and_qubits = []
@@ -191,7 +191,11 @@ class QubitFuncWrapper(OpConstructor):
             outputs = self.op(*input_list, **kwargs)
             if isinstance(outputs, Qubit):
                 outputs = (outputs,)
-            return context.put_qubits_in_local_context_order(*outputs)
+            in_context_qubits = context.put_qubits_in_local_context_order(*outputs)
+            if len(in_context_qubits) == 1:
+                return in_context_qubits[0]
+            else:
+                return in_context_qubits
 
     def wrap_op_hook(self, opconstructor: Callable[[OpConstructor], OpConstructor],
                      consumed_inputs: Optional[Sequence[int]] = None) -> OpConstructor:

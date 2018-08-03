@@ -2,7 +2,8 @@ from __future__ import print_function
 
 import numpy
 import collections
-from typing import Mapping, Union, Sequence, MutableSequence, Tuple, Any, Optional, Callable, TypeVar, Iterable, cast
+from typing import Mapping, Union, Sequence, MutableSequence, Tuple, Any
+from typing import Optional, Callable, TypeVar, Iterable, List, cast
 
 InitialState = Union[MutableSequence[complex], int, numpy.ndarray]
 # This should be Anything subscriptable
@@ -148,7 +149,7 @@ def bitarray_to_uint(bits: Sequence[int]) -> int:
     return s
 
 
-def flatten(lst: Sequence[Union[T, Iterable[T]]]) -> Sequence[T]:
+def flatten(lst: Sequence[Iterable[T]]) -> List[T]:
     listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in lst]
     return [item for sublist in listgen for item in sublist]
 
