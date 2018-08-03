@@ -1,12 +1,14 @@
 from qip.pipeline import run_graph, get_deps
-from qip.pipeline import GraphAccumulator
+from qip.pipeline import GraphAccumulator, PipelineObject
 from qip.operators import SwapOp, COp, NotOp
+from typing import Mapping, Sequence, Optional, cast
 
 
 class SvgFeeder(GraphAccumulator):
     BLACKLIST = ["SplitQubit", "Q"]
 
-    def __init__(self, n, linespacing=20, opheight=10, opbuffer=10, linewidth=2, opoutlinewidth=1, fontwidth=7):
+    def __init__(self, n: int, linespacing: int = 20, opheight: int = 10, opbuffer: int = 10,
+                 linewidth: int = 2, opoutlinewidth: int = 1, fontwidth: int = 7):
         self.svg_acc = ''
         self.n = n
         self.linespacing = linespacing
@@ -22,14 +24,14 @@ class SvgFeeder(GraphAccumulator):
         # Ops to draw once lines have been drawn.
         self.ops_to_draw = []
 
-    def trim_op_name(self, node):
+    def trim_op_name(self, node: PipelineObject) -> str:
         nodestr = repr(node)
         paren_pos = nodestr.find('(')
         if paren_pos > 0:
             nodestr = nodestr[:paren_pos]
         return nodestr
 
-    def get_op_string(self, qbitindex, node, x):
+    def get_op_string(self, qbitindex: Mapping[PipelineObject, Sequence[int]], node: PipelineObject, x: float) -> str:
         s = ""
         # Add ops to list with relevant positions.
         node_indices = qbitindex[node]
@@ -60,6 +62,7 @@ class SvgFeeder(GraphAccumulator):
                     self.linewidth
                 )
         elif type(node) == COp:
+            node = cast(COp, node)
             # First index gets the dot, others drawn as normal with a line behind them all.
             s += '<circle cx="{}" cy="{}" r="{}" stroke="black" stroke-width="1" fill="black" />'.format(
                 x, node_indices[0] * self.linespacing + self.opheight,
@@ -105,27 +108,25 @@ class SvgFeeder(GraphAccumulator):
                 s += poly_str + text_str
         return s
 
-    def feed(self, qbitindex, node):
+    def feed(self, qbitindex: Mapping[PipelineObject, Sequence[int]], node: PipelineObject):
         # Get new node position
         nodestr = self.trim_op_name(node)
 
-        if nodestr in SvgFeeder.BLACKLIST:
-            return
+        if nodestr not in SvgFeeder.BLACKLIST:
+            stringn = len(nodestr)
 
-        stringn = len(nodestr)
+            total_op_size = self.font_size * stringn / 2 + 1
+            new_x_center = self.last_x_max + self.opbuffer + int(total_op_size/2.0)
+            new_x_max = new_x_center + total_op_size - int(total_op_size/2.0)
 
-        total_op_size = self.font_size * stringn / 2 + 1
-        new_x_center = self.last_x_max + self.opbuffer + int(total_op_size/2.0)
-        new_x_max = new_x_center + total_op_size - int(total_op_size/2.0)
+            op_str = self.get_op_string(qbitindex, node, new_x_center)
+            self.ops_to_draw.append(op_str)
 
-        op_str = self.get_op_string(qbitindex, node, new_x_center)
-        self.ops_to_draw.append(op_str)
+            # Get ready for next node.
+            self.last_x_center = new_x_center
+            self.last_x_max = new_x_max
 
-        # Get ready for next node.
-        self.last_x_center = new_x_center
-        self.last_x_max = new_x_max
-
-    def build(self):
+    def build(self) -> str:
         acc_str = ''
 
         # Start by extending lines to new position.
@@ -142,7 +143,7 @@ class SvgFeeder(GraphAccumulator):
 
         return acc_str
 
-    def get_svg_text(self):
+    def get_svg_text(self) -> str:
         op_str = self.build()
         tmp = '<svg viewBox="0 0 {} {}" xmlns="http://www.w3.org/2000/svg">\n{}\n{}\n</svg>'.format(
             self.last_x_max + self.opbuffer, self.linespacing*self.n + 2*self.opheight,
@@ -151,7 +152,7 @@ class SvgFeeder(GraphAccumulator):
         return tmp
 
 
-def make_svg(*args, filename=None):
+def make_svg(*args: PipelineObject, filename=None) -> Optional[str]:
     frontier, graphnodes = get_deps(*args)
     frontier = list(sorted(frontier, key=lambda q: q.qid))
     n = sum(f.n for f in frontier)

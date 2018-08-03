@@ -315,9 +315,23 @@ class TestQubitMethods(unittest.TestCase):
 
         self.assertTrue(numpy.allclose(o1, o2))
 
+    def test_fop_withq(self):
+        # reg2 = 1 and f(x) = 1 therefore f(x)^reg2 == 0
+        n = 2
+        reg1 = Qubit(n=n, default=[1, 2, 3, 4])
+        reg2 = Qubit(n=n, default=[0, 1, 0, 0])
+        freg1, freg2 = F(lambda x: 1, reg1, reg2)
+        o1, _ = run(freg1, freg2)
+
+        mock1 = Qubit(n=n, default=[1, 2, 3, 4])
+        mock2 = Qubit(n=n, default=[1, 0, 0, 0])
+        o2, _ = run(mock1, mock2)
+
+        self.assertTrue(numpy.allclose(o1, o2))
+
     def test_fop_regsize(self):
         n = 2
-        reg1 = Qubit(n=2*n, default=numpy.ones(2**(2*n))*pow(2**(2*n),-0.5))
+        reg1 = Qubit(n=2*n, default=numpy.ones(2**(2*n)) * pow(2**(2*n), -0.5))
         reg2 = Qubit(n=n)
         freg1, freg2 = F(lambda x: pow(3, x, 2**n), reg1, reg2)
         o1, _ = run(freg1, freg2)
@@ -344,8 +358,11 @@ class TestQubitMethods(unittest.TestCase):
         # CCNOT
         c1, c2, c3 = C(C(Not))(q1,q2,q3)
 
-        o, c = run(c1,c2,c3, feed={q1: [pow(2,-0.5),pow(2,-0.5)], q2: [pow(2,-0.5), pow(2,-0.5)]})
-        self.assertTrue(numpy.allclose(numpy.abs(o), [0.5,0,0.5,0,0.5,0,0,0.5]))
+        o, c = run(c1, c2, c3, feed={q1: [pow(2, -0.5),pow(2, -0.5)],
+                                     q2: [pow(2,-0.5), pow(2, -0.5)]})
+        self.assertTrue(numpy.allclose(numpy.abs(o), [0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5]))
+
+
 
 if __name__ == '__main__':
     unittest.main()

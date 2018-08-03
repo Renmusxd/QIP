@@ -1,22 +1,92 @@
 import numpy
-from qip.util import gen_edit_indices
 from qip.util import flatten
-from qip.backend import CythonBackend
+from qip.backend import Backend, InitialState, StateType, CythonBackend
+from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Iterable
 
 
-def run(*args, state=None, feed=None, statetype=numpy.complex128, strict=False, backend_constructor=CythonBackend, **kwargs):
+class PipelineObject(object):
+    def __init__(self, quantum: bool, default: InitialState = None, n: int = 0):
+        self.quantum = quantum
+        self.inputs = []
+        self.sink = []
+        self.default = default
+        # PipelineObjects don't be default contribute to qubit circuit.
+        self.n = n
+
+    def run(self, state: InitialState = None, feed: Mapping['PipelineObject', InitialState] = None, **kwargs):
+        return run(self, state=state, feed=feed, **kwargs)
+
+    def feed(self, inputvals: StateType, qbitindex: Mapping['PipelineObject', Sequence[int]], n: int, arena: StateType,
+             backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
+        """
+        Operate on the state of the system.
+        :param inputvals: input state
+        :param qbitindex: mapping of qbit to global index
+        :param n: number of qubits
+        :param arena: memory arena to use for computations
+        :param backend: backend to use for matrix operations
+        :return: (state, state_arena, (num classic bits, int bits))
+        """
+        return self.feed_indices(inputvals, [qbitindex[q] for q in self.inputs], n, arena, backend)
+
+    def feed_indices(self, inputvals: StateType, index_groups: Sequence[Sequence[int]], n: int, arena: StateType,
+                     backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
+        """
+        Operate on the state of the system.
+        :param inputvals: state
+        :param index_groups: array of arrays of indicies used by each input in order.
+        :param n: number of qubits
+        :param arena: arena for state
+        :param backend: backend to use for matrix operations
+        :return: (state, state_arena, (num classic bits, int bits))
+        """
+        # Return identity
+        return inputvals, arena, (0, 0)
+
+    def select_index(self, indices: Sequence[int]) -> Sequence[int]:
+        """
+        May be overridden to modify index selection (see SplitQubit).
+        :param indices: list of indices from all inputs nodes
+        :return:
+        """
+        return indices
+
+    def remap_index(self, index_map: Mapping['PipelineObject', int], n: int) -> Mapping['PipelineObject', int]:
+        """
+        May be override to rearrange qubits if needed
+        :param index_map: map of Qubit -> Index
+        :param n: n qubits in system
+        :return: new index_map
+        """
+        return index_map
+
+    def set_sink(self, sink: 'PipelineObject'):
+        self.sink += [sink]
+
+    def get_inputs(self) -> Sequence['PipelineObject']:
+        return self.inputs
+
+    def __hash__(self):
+        return hash(repr(self))
+
+
+def run(*args: PipelineObject,  state: InitialState = None, feed: Mapping[PipelineObject, InitialState] = None,
+        statetype=numpy.complex128, strict: bool = False, backend_constructor: Callable[[int], Backend] = CythonBackend,
+        **kwargs):
     """
     Runs pipeline using all qubits in *args. Produces an output state based on input.
     :param args: list of qubits to evaluate
     :param state: full state of n qbits
     :param feed: feed of individual qbit states
     :param statetype: type of state data (should be complex numpy value).
+    :param strict: requires all qubits to have states in feed, none implicitly defined as |0>
+    :param backend_constructor
     :return: state of full qubit system (2**n array)
     """
     if feed is None:
         feed = {}
     else:
-        feed = feed.copy()
+        feed = {k: feed[k] for k in feed}
 
     # Frontier contains all qubits required for execution
     # Assume 0 unless in feed
@@ -56,7 +126,8 @@ def run(*args, state=None, feed=None, statetype=numpy.complex128, strict=False, 
     return feed_forward(frontier, state, arena, graphnodes, backend)
 
 
-def get_deps(*args, feed=None):
+def get_deps(*args: PipelineObject, feed: Mapping[PipelineObject, InitialState] = None) \
+        -> Tuple[Sequence[PipelineObject], AbstractSet[PipelineObject]]:
     """
     Gets all graph nodes required for evaluation of graph.
     :param args: desired output nodes.
@@ -80,7 +151,7 @@ def get_deps(*args, feed=None):
     return list(deps), seen
 
 
-def make_circuit_mat(*args):
+def make_circuit_mat(*args: PipelineObject) -> numpy.ndarray:
     """
     Gives matrix for quantum part of circuit, ignores measurements.
     :param args: outputs (like run(...))
@@ -99,11 +170,11 @@ def make_circuit_mat(*args):
 
 
 class GraphAccumulator:
-    def feed(self, qbitindex, node):
+    def feed(self, qbitindex: Mapping[PipelineObject, Sequence[int]], node: PipelineObject) -> None:
         raise NotImplemented("Method not implemented.")
 
 
-def run_graph(frontier, graphnodes, graphacc):
+def run_graph(frontier: Sequence[PipelineObject], graphnodes: AbstractSet[PipelineObject], graphacc: GraphAccumulator):
     """
     Apply the feed function from graphacc to each node in the graph in the order necessary to run the circuit.
     :param frontier: top level nodes of graph
@@ -143,17 +214,18 @@ def run_graph(frontier, graphnodes, graphacc):
 
 
 class NodeFeeder(GraphAccumulator):
-    def __init__(self, state, arena, n, backend):
+    def __init__(self, state: StateType, arena: StateType, n: int, backend: Backend):
         self.state = state
         self.arena = arena
         self.n = n
         self.classic_map = {}
         self.backend = backend
 
-        if len(self.state) != 2 ** n:
-            raise ValueError("Size of state must be 2**n")
+        # TODO make state agnostic version
+        # if len(self.state) != 2 ** n:
+        #     raise ValueError("Size of state must be 2**n")
 
-    def feed(self, qbitindex, node):
+    def feed(self, qbitindex: Mapping[PipelineObject, Sequence[int]], node: PipelineObject):
         self.state, self.arena, (n_bits, bits) = node.feed(self.state, qbitindex, self.n, self.arena, self.backend)
 
         if n_bits > 0 or bits is not None:
@@ -161,17 +233,18 @@ class NodeFeeder(GraphAccumulator):
             self.n -= n_bits
 
 
-def feed_forward(frontier, state, arena, graphnodes, backend):
+def feed_forward(frontier: Sequence[PipelineObject], state: StateType, arena: StateType,
+                 graphnodes: AbstractSet[PipelineObject], backend: Backend):
     n = sum(f.n for f in frontier)
     graphacc = NodeFeeder(state, arena, n, backend)
     run_graph(frontier, graphnodes, graphacc)
-    return graphacc.state, graphacc.classic_map
+    return graphacc.state.state, graphacc.classic_map
 
 
 class PrintFeeder(GraphAccumulator):
     BLACKLIST = ["SplitQubit", "Q"]
 
-    def __init__(self, n, opwidth=1, linespacing=1, outputfn=print):
+    def __init__(self, n: int, opwidth: int = 1, linespacing: int = 1, outputfn: Callable[[str], None] = print):
         self.opwidth = opwidth
         self.linespacing = linespacing
         self.outputfn = outputfn
@@ -222,7 +295,7 @@ class PrintFeeder(GraphAccumulator):
                 self.outputfn((" " * self.linespacing).join(default_line))
 
 
-def printCircuit(*args, opwidth=1, linespacing=1, outputfn=print):
+def print_circuit(*args, opwidth: int = 1, linespacing: int = 1, outputfn: Callable[[str], None] = print):
     frontier, graphnodes = get_deps(*args)
     frontier = list(sorted(frontier, key=lambda q: q.qid))
     n = sum(f.n for f in frontier)

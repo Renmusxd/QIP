@@ -2,9 +2,19 @@ from __future__ import print_function
 
 import numpy
 import collections
+from typing import Mapping, Union, Sequence, MutableSequence, Tuple, Any
+from typing import Optional, Callable, TypeVar, Iterable, List, cast
+
+InitialState = Union[MutableSequence[complex], int, numpy.ndarray]
+# This should be Anything subscriptable
+IndexType = Union[int, Tuple[int, ...]]
+MatrixType = Any
+T = TypeVar('T')
 
 
-def kronselect_dot(mats, vec, n, outputarray, input_offset=0, output_offset=0, dot_impl=None):
+def kronselect_dot(mats: Mapping[IndexType, MatrixType], vec: MutableSequence[complex], n: int,
+                   outputarray: MutableSequence[complex],
+                   input_offset: int = 0, output_offset: int = 0, dot_impl: Optional[Callable] = None):
     """
     Efficiently performs the operation: OuterProduct( m1, m2, ..., mn ) dot vec
     for the case where most mj are identity.
@@ -57,7 +67,8 @@ def kronselect_dot(mats, vec, n, outputarray, input_offset=0, output_offset=0, d
         dot_loop(newmats, vec, n, outputarray, input_offset=input_offset, output_offset=output_offset)
 
 
-def dot_loop(mats, vec, n, output, input_offset=0, output_offset=0):
+def dot_loop(mats: Mapping[IndexType, MatrixType], vec: MutableSequence[complex], n: int,
+             output: MutableSequence[complex], input_offset: int = 0, output_offset: int = 0):
     allindices = list(mats.keys())
     flatindices = list(sorted(set(index for indices in allindices for index in indices)))
 
@@ -80,10 +91,9 @@ def dot_loop(mats, vec, n, output, input_offset=0, output_offset=0):
 
             s += p*vec[input_col]
         output[outputrow] = s
-    return output
 
 
-def gen_valid_col_and_matcol(row, matindices, n):
+def gen_valid_col_and_matcol(row: int, matindices: Sequence[int], n: int):
     rowbits = uint_to_bitarray(row, n)
     colbits = rowbits[:]
 
@@ -95,7 +105,7 @@ def gen_valid_col_and_matcol(row, matindices, n):
         yield (row, bitarray_to_uint(colbits)), {matindices[j]: item for j, item in enumerate(zip(matrow, matcol))}
 
 
-def gen_edit_indices(index_groups, maxindex):
+def gen_edit_indices(index_groups: Sequence[Sequence[int]], maxindex: int):
     if len(index_groups) > 0:
         allindices = flatten(index_groups)
 
@@ -114,17 +124,17 @@ def gen_edit_indices(index_groups, maxindex):
             yield bitarray_to_uint(bits), qbit_state_indices
 
 
-def expand_kron_matrix(mats, n):
+def expand_kron_matrix(mats: Mapping[IndexType, MatrixType], n: int) -> numpy.ndarray:
     m = numpy.zeros((2**n, 2**n), dtype=numpy.complex128)
     mats = {i: numpy.array(mats[i], dtype=numpy.complex128) for i in mats}
     for i in range(2**n):
-        v = numpy.zeros((2**n,), dtype=numpy.complex128)
+        v = cast(MutableSequence[complex], numpy.zeros((2**n,), dtype=numpy.complex128))
         v[i] = 1.0
         kronselect_dot(mats, v, n, m[i, :])
     return m
 
 
-def uint_to_bitarray(num, n):
+def uint_to_bitarray(num: int, n: int) -> Sequence[int]:
     bits = []
     for i in range(n):
         bits.append(num % 2)
@@ -132,19 +142,19 @@ def uint_to_bitarray(num, n):
     return bits[::-1]
 
 
-def bitarray_to_uint(bits):
+def bitarray_to_uint(bits: Sequence[int]) -> int:
     s = 0
     for i in range(len(bits)):
         s += 2**i if bits[len(bits)-i-1] else 0
     return s
 
 
-def flatten(lst):
+def flatten(lst: Sequence[Iterable[T]]) -> List[T]:
     listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in lst]
     return [item for sublist in listgen for item in sublist]
 
 
-def qubit_index_notation(i, *qns, n=None):
+def qubit_index_notation(i: int, *qns: int, n: int = None) -> Sequence[int]:
     if n is None:
         n = sum(qns)
     index_array = []
@@ -157,7 +167,7 @@ def qubit_index_notation(i, *qns, n=None):
     return index_array
 
 
-def gen_qubit_prints(state, *qs):
+def gen_qubit_prints(state: Sequence[complex], *qs: Union[int, Any]):
     qubit_sizes = []
     for q in qs:
         if type(q) == int:
@@ -169,7 +179,6 @@ def gen_qubit_prints(state, *qs):
         if state[i] == 0:
             continue
         s = "|"
-        s += ",".join(map(str,qubit_index_notation(i,*qubit_sizes,n=n)))
+        s += ",".join(map(str,qubit_index_notation(i, *qubit_sizes, n=n)))
         s += "> = {}".format(state[i])
         yield s
-
