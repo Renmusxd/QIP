@@ -39,7 +39,7 @@ o, _ = m1.run(feed={q1:state1, q2: state2, q3: state3})
 ```
 `o` is a vector of size 2048 giving the complete state for each possible `|q1, q2, q3>`
 
-For more examples see the [wiki](https://github.com/Renmusxd/QIP/wiki)! QIP supports many useful features such as type annotations, wrapping functions to become first class operators, and abstract backends and graph accumulators!
+For more examples see the [wiki](https://github.com/Renmusxd/QIP/wiki) or the [examples directory](https://github.com/Renmusxd/QIP/tree/master/examples)! QIP supports many useful features such as type annotations, wrapping functions to become first class operators, and abstract backends and graph accumulators!
 
 ## Installation
 Installation via pip with `pip install qip` or manually by cloning the repo, install requirements from `requirements.txt` using `pip install -r requirements.txt`, and run `python setup.py build_ext --inplace && python setup.py install`.
