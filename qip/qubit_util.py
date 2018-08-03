@@ -55,7 +55,7 @@ class QubitWrapperContext:
             op_func = QubitWrapperContext.make_context_constructor(op_func, op_args=op_args, op_kwargs=op_kwargs)
 
         # Dont change dict in case it's being reused
-        op_kwargs = op_kwargs.copy() if op_kwargs else {}
+        op_kwargs = {op_kwargs[k] for k in op_kwargs} if op_kwargs else {}
         # Any other ops built by this call should not have context reapplied.
         op_kwargs['nocontext'] = True
         op_kwargs['nosplit'] = True
@@ -96,8 +96,6 @@ class QubitWrapperContext:
     @staticmethod
     def make_context_constructor(op_func: OpConstructor, op_args: Optional[Sequence[Any]] = None,
                                  op_kwargs: Optional[Mapping[str, Any]] = None) -> OpConstructor:
-        # TODO deal with op_args/op_kwargs going to first op_func properly
-        # need to feed to constructor at base, but not the ones above that.
         all_context = QubitWrapperContext.get_context()
         for context_constructor, context_qubits, context_indices in reversed(all_context):
             op_func = context_constructor(op_func)
