@@ -1,9 +1,10 @@
 from qip.qip import Qubit
-from qip.operators import H, C, Rm, Swap, QubitOpWrapper
+from qip.operators import H, C, Rm, Swap
 from qip.util import flatten
+from typing import Union, Tuple, List
 
 
-def QFFT(*inputs, rev=True):
+def QFFT(*inputs: Qubit, rev: bool = True) -> Union[Qubit, Tuple[Qubit, ...]]:
     qarr = flatten([inp.split(range(inp.n)) for inp in inputs])
     recQFFT(qarr)
 
@@ -27,7 +28,7 @@ def QFFT(*inputs, rev=True):
         return outputqarr[0]
 
 
-def recQFFT(qarr, offset=0):
+def recQFFT(qarr: List[Qubit], offset: int = 0):
     if len(qarr) > offset:
         qarr[offset] = H(qarr[offset])
         for i in range(offset+1, len(qarr)):
@@ -36,5 +37,5 @@ def recQFFT(qarr, offset=0):
         recQFFT(qarr, offset + 1)
 
 
-def makeR(m):
+def makeR(m: int) -> Rm:
     return lambda *inputs, **kwargs: Rm(m, *inputs, negate=True, **kwargs)

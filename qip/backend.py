@@ -2,28 +2,9 @@ from qip.ext.kronprod import cdot_loop
 from qip.ext.kronprod import measure
 from qip.ext.kronprod import measure_probabilities
 from qip.ext.func_apply import func_apply
-from qip.util import kronselect_dot
-from qip.util import gen_edit_indices
-from qip.util import flatten
+from qip.util import kronselect_dot, gen_edit_indices, InitialState, IndexType, MatrixType
 import numpy
-from typing import Union, List
-
-
-class Backend:
-    def __init__(self, n):
-        self.n = n
-
-    def kronselect_dot(self, mats, vec, n, outputarray):
-        raise NotImplemented("kronselect_dot not implemented by base class")
-
-    def func_apply(self, reg1_indices, reg2_indices, func, vec, n, output):
-        raise NotImplemented("func_apply not implemented by base class")
-
-    def measure(self, indices, n, vec, out, measured=None, measured_prob=None):
-        raise NotImplemented("measure not implemented by base class")
-
-    def measure_probabilities(self, indices, n, vec):
-        raise NotImplemented("measure_probabilities not implemented by base class")
+from typing import Union, Sequence, Any, Tuple, Mapping, Callable, Optional
 
 
 class StateType:
@@ -34,11 +15,36 @@ class StateType:
         return self.state
 
 
+class Backend:
+    def __init__(self, n: int):
+        self.n = n
+
+    def make_state(self, *args, **kwargs) -> StateType:
+        raise NotImplemented("make_state not implemented by base class")
+
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], vec: StateType, n: int,
+                       outputarray: StateType):
+        raise NotImplemented("kronselect_dot not implemented by base class")
+
+    def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
+                   vec: StateType, n: int, output: StateType):
+        raise NotImplemented("func_apply not implemented by base class")
+
+    def measure(self, indices: Sequence[int], n: int, vec: StateType, out: StateType, measured: Optional[int] = None,
+                measured_prob: Optional[float] = None):
+        raise NotImplemented("measure not implemented by base class")
+
+    def measure_probabilities(self, indices: Sequence[int], n: int, vec: StateType):
+        raise NotImplemented("measure_probabilities not implemented by base class")
+
+
 class CythonBackend(Backend):
     def __init__(self, n):
         super().__init__(n)
 
-    def make_state(self, index_groups, feed_list, state=None, statetype=numpy.complex128):
+    def make_state(self, index_groups: Sequence[Sequence[int]], feed_list: Mapping[Sequence[int], InitialState],
+                   state: StateType = None, statetype: type = numpy.complex128) -> Tuple[StateType, StateType]:
+        # TODO rewrite in state type agnostic form
         if state is None:
             state = numpy.zeros(2 ** self.n, dtype=statetype)
 
@@ -60,14 +66,17 @@ class CythonBackend(Backend):
             state = numpy.array(state)
         return state, state.copy()
 
-    def kronselect_dot(self, mats, vec, n, outputarray):
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], vec: StateType, n: int,
+                       outputarray: StateType):
         return kronselect_dot(mats, vec, n, outputarray, dot_impl=cdot_loop)
 
-    def func_apply(self, reg1_indices, reg2_indices, func, vec, n, output):
+    def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
+                   vec: StateType, n: int, output: StateType):
         return func_apply(reg1_indices, reg2_indices, func, vec, n, output)
 
-    def measure(self, indices, n, vec, out, measured=None, measured_prob=None):
+    def measure(self, indices: Sequence[int], n: int, vec: StateType, out: StateType, measured: Optional[int] = None,
+                measured_prob: Optional[float] = None):
         return measure(indices, n, vec, out, measured=measured, measured_prob=measured_prob)
 
-    def measure_probabilities(self, indices, n, vec):
+    def measure_probabilities(self, indices: Sequence[int], n: int, vec: StateType):
         return measure_probabilities(indices, n, vec)

@@ -363,5 +363,6 @@ class TestQubitMethods(unittest.TestCase):
         self.assertTrue(numpy.allclose(numpy.abs(o), [0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5]))
 
 
+
 if __name__ == '__main__':
     unittest.main()
