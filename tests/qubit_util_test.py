@@ -113,3 +113,27 @@ class TestQubitMethods(unittest.TestCase):
         o2, _ = run(c4, c5, c6)
 
         self.assertTrue(numpy.allclose(o1, o2))
+
+    def test_function_double_nested_c(self):
+
+        @QubitFuncWrapper.wrap
+        def circuit(*args):
+            return C(C(H))(*args)
+
+        q1 = Qubit(n=1, default=[pow(2, -0.5), pow(2, -0.5)])
+        q2 = Qubit(n=1, default=[pow(2, -0.5), pow(2, -0.5)])
+        q3 = Qubit(n=1, default=[pow(2, -0.5), pow(2, -0.5)])
+        q4 = Qubit(n=1)
+
+        c1, c2, c3, c4 = C(C(C(H)))(q1, q2, q3, q4)
+        o1, _ = run(c1, c2, c3, c4)
+
+        q5 = Qubit(n=1, default=[pow(2, -0.5), pow(2, -0.5)])
+        q6 = Qubit(n=1, default=[pow(2, -0.5), pow(2, -0.5)])
+        q7 = Qubit(n=1, default=[pow(2, -0.5), pow(2, -0.5)])
+        q8 = Qubit(n=1)
+
+        c5, c6, c7, c8 = C(circuit)(q5, q6, q7, q8)
+        o2, _ = run(c5, c6, c7, c8)
+
+        self.assertTrue(numpy.allclose(o1, o2))
