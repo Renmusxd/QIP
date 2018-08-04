@@ -18,8 +18,11 @@
 
 
 # -- Project information -----------------------------------------------------
+import sys
+import os
+sys.path.insert(0, os.path.abspath('mymodule'))
 
-project = 'Qip'
+project = 'qip'
 copyright = '2018, Sumner Hearth'
 author = 'Sumner Hearth'
 
