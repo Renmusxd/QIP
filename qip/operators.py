@@ -28,7 +28,7 @@ class MatrixOp(Qubit):
 
 
 class NotOp(MatrixOp):
-    def __init__(self, *inputs, **kwargs):
+    def __init__(self, *inputs: Qubit, **kwargs):
         super().__init__(*inputs, **kwargs)
 
     def makemats(self, index_groups: Sequence[Sequence[int]]) -> Mapping[IndexType, MatrixType]:
@@ -40,6 +40,47 @@ class NotOp(MatrixOp):
 
 
 Not = QubitOpWrapper(NotOp)
+
+
+class XOp(NotOp):
+    def __init__(self, *inputs: Qubit, **kwargs):
+        super().__init__(*inputs, **kwargs)
+
+    def __repr__(self):
+        return "X({})".format(self.qid)
+
+
+X = QubitOpWrapper(XOp)
+
+
+class YOp(MatrixOp):
+    def __init__(self, *inputs: Qubit, **kwargs):
+        super().__init__(*inputs, **kwargs)
+
+    def makemats(self, index_groups: Sequence[Sequence[int]]) -> Mapping[IndexType, MatrixType]:
+        return {i: numpy.array([[0.0, -1.0j],[1.0j, 0.0]])
+                for i in flatten(index_groups)}
+
+    def __repr__(self) -> str:
+        return "Y({})".format(self.qid)
+
+
+Y = QubitOpWrapper(YOp)
+
+
+class ZOp(MatrixOp):
+    def __init__(self, *inputs: Qubit, **kwargs):
+        super().__init__(*inputs, **kwargs)
+
+    def makemats(self, index_groups: Sequence[Sequence[int]]) -> Mapping[IndexType, MatrixType]:
+        return {i: numpy.array([[1.0, 0.0],[0.0j, -1.0]])
+                for i in flatten(index_groups)}
+
+    def __repr__(self) -> str:
+        return "Z({})".format(self.qid)
+
+
+Z = QubitOpWrapper(ZOp)
 
 
 class HOp(MatrixOp):

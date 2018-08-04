@@ -53,6 +53,9 @@ class Qubit(PipelineObject):
             for qubit in self.inputs:
                 indices.append(qubit.n + index)
                 index += qubit.n
+            # No need to wrap a SplitQubit around a single output.
+            if len(indices) == 1:
+                return self,
         else:
             indices = list(sorted(indices))
 
