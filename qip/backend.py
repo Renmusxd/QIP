@@ -21,7 +21,7 @@ class Backend:
     def __init__(self, n: int):
         self.n = n
 
-    def make_state(self, *args, **kwargs) -> StateType:
+    def make_state(self, *args, **kwargs) -> Tuple[StateType, StateType]:
         raise NotImplemented("make_state not implemented by base class")
 
     def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], vec: StateType, n: int,
