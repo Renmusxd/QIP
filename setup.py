@@ -18,15 +18,27 @@ class CustomBuildExtCommand(build_ext):
         build_ext.run(self)
 
 
-if platform.startswith('linux') or 'OPENMP' in os.environ:
-    print("="*10 + " Attempting install with OpenMP support " + "="*10)
-    has_openmp = True
-else:
-    print("="*10 + " OSX and Windows may not support OpenMP! Set the environment variable OPENMP to enable! " + "="*10)
-    print("="*10 + " plus use the CC environment variable to set the preferred compiler (i.e. gcc for osx)  " + "="*10)
-    has_openmp = False
+has_openmp = platform.lower().startswith('linux') or 'OPENMP' in os.environ
 
-parallel_flags = ['-fopenmp']
+if has_openmp:
+    print("="*10 + " Attempting install with OpenMP support " + "="*10)
+    if platform.lower().startswith('darwin'):
+        # OSX is hard
+        print("!!! OpenMP on OSX can be tricky, make sure to install it using [brew install libomp] !!!")
+        print("!!! if compilation/runtime fails you can export a NOOPENMP environment variable to   !!!")
+        print("!!! disable openmp, or else specify an install location with 'export OPENMP=...'     !!!")
+        parallel_flags = ['-Xclang', '-fopenmp', '-lomp']
+        if 'OPENMP_PATH' in os.environ:
+            parallel_flags += ['-I'+os.path.join(os.environ['OPENMP'],'include')]
+            parallel_flags += ['-L' + os.path.join(os.environ['OPENMP'], 'lib/libomp.dylib')]
+    else:
+        # Linux is easy
+        parallel_flags = ['-fopenmp']
+else:
+    print("="*10 + " OSX and Windows may not support OpenMP!       " + "="*10)
+    print("="*10 + " export OPENMP environment variable to enable. " + "="*10)
+    parallel_flags = []
+
 extra_compile_flags = ["-O3", "-ffast-math", "-march=native"] + (parallel_flags if has_openmp else [])
 extra_link_args = parallel_flags if has_openmp else []
 
