@@ -23,7 +23,7 @@ class DistributedBackend(Backend):
 
     def make_state(self, index_groups: Sequence[Sequence[int]], feed_list: Mapping[Sequence[int], InitialState],
                    state: InitialState = None, startindex: Optional[int] = None, endindex: Optional[int] = None,
-                   statetype: type = numpy.complex128) -> Tuple[StateType, StateType]:
+                   statetype: type = numpy.complex128) -> StateType:
         if startindex is not None or endindex is not None:
             raise ValueError("Distributed backends don't yet support subsections")
 
@@ -48,21 +48,20 @@ class DistributedBackend(Backend):
         if resp.has_error_message():
             raise Exception(resp.error_message)
         else:
-            pass
+            return StateType(resp.state_handle)
 
-    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], vec: StateType, n: int,
-                       outputarray: StateType) -> None:
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int) -> None:
         raise NotImplemented()
 
     def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
-                   vec: StateType, n: int, output: StateType) -> None:
+                   state: StateType, n: int) -> None:
         raise NotImplemented()
 
-    def measure(self, indices: Sequence[int], n: int, vec: StateType, out: StateType, measured: Optional[int] = None,
-                measured_prob: Optional[float] = None) -> Tuple[StateType, StateType, int]:
+    def measure(self, indices: Sequence[int], n: int, state: StateType, measured: Optional[int] = None,
+                measured_prob: Optional[float] = None) -> Tuple[StateType, int]:
         raise NotImplemented()
 
-    def measure_probabilities(self, indices: Sequence[int], n: int, vec: StateType) -> Sequence[float]:
+    def measure_probabilities(self, indices: Sequence[int], n: int, state: StateType) -> Sequence[float]:
         raise NotImplemented()
 
     def close(self):

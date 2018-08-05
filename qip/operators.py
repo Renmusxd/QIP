@@ -11,12 +11,12 @@ class MatrixOp(Qubit):
         super().__init__(*inputs, **kwargs)
         self.ms = None
 
-    def feed_indices(self, inputvals: StateType, index_groups: Sequence[Sequence[int]], n: int, arena: StateType,
-                     backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
+                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
         if self.ms is None:
             self.ms = self.makemats(index_groups)
-        backend.kronselect_dot(self.ms, inputvals, n, arena)
-        return arena, inputvals,  (0, 0)
+        backend.kronselect_dot(self.ms, state, n)
+        return state, (0, 0)
 
     def makemats(self, index_groups: Sequence[Sequence[int]]) -> Mapping[IndexType, MatrixType]:
         """
@@ -263,12 +263,12 @@ class FOp(Qubit):
         self.reg1 = reg1
         self.reg2 = reg2
 
-    def feed_indices(self, inputvals: StateType, index_groups: Sequence[Sequence[int]], n: int, arena: StateType,
-                     backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
+                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
         reg1 = numpy.array(index_groups[0], dtype=numpy.int32)
         reg2 = numpy.array(index_groups[1], dtype=numpy.int32)
-        backend.func_apply(reg1, reg2, self.func, inputvals, n, arena)
-        return arena, inputvals, (0, 0)
+        backend.func_apply(reg1, reg2, self.func, state, n)
+        return state, (0, 0)
 
     def __repr__(self) -> str:
         return "F({}, {})".format(self.reg1, self.reg2)
