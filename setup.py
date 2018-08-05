@@ -69,7 +69,7 @@ else:
 
 setup(
     name='QIP',
-    version='0.4.0',
+    version='0.5.0',
     python_requires='>3.4',
     description='Quantum Computing Library',
     long_description='QIP: A quantum computing simulation library.',
@@ -79,8 +79,8 @@ setup(
     license='MIT',
     packages=find_packages(exclude=('tests','benchmark')),
     cmdclass={'build_ext': CustomBuildExtCommand},
-    requires=['numpy'],
-    install_requires=['numpy'],
-    setup_requires=['numpy'],
+    requires=['numpy', 'protobuf'],
+    install_requires=['numpy', 'protobuf'],
+    setup_requires=['numpy', 'protobuf'],
     ext_modules=extensions
 )

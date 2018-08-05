@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-from qip.distributed.messages import WorkerSetup
+from qip.distributed.proto import WorkerSetup
 from qip.distributed import formatsock
 from threading import Thread, Lock, Condition
 from threading import Lock

@@ -1,4 +1,4 @@
-from qip.distributed.messages import WorkerDone, WorkerSetup, WorkerOperation, WorkerSyncCommand
+from qip.distributed.proto import WorkerSetup, WorkerOperation, WorkerConfirm
 
 
 class ServerBackend:

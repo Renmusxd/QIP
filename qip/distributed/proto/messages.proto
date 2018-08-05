@@ -1,0 +1,83 @@
+syntax = "proto2";
+
+package distributed;
+
+// Default values needed in many messages
+message ComplexVector {
+    // Size of both real and imaginary must be the same.
+    repeated double real = 1 [packed = true];
+    repeated double imag = 2 [packed = true];
+}
+
+message ComplexMatrix {
+    optional int32 cols = 1;
+    optional int32 rows = 2;
+    optional ComplexVector data = 3;
+}
+
+message Indices {
+    repeated int32 index = 1;
+}
+
+message State {
+    optional Indices indices = 1;
+    oneof state {
+        ComplexVector vector = 2;
+        int64 index = 3; // All zeros except this index which is 1.0
+    }
+}
+
+// Use-case specific messages
+
+// Message to send to distributed manager to start worker states
+message StateSetup {
+    optional int32 n = 1;
+    repeated State states = 2;
+}
+
+// Response from manager for making a state
+message StateHandler {
+    oneof handle {
+        string state_handle = 1;
+        string error_message = 2;
+    }
+}
+
+// Message to send to each worker to make local state
+message WorkerSetup {
+    optional int32 n = 1;
+    repeated State states = 2;
+    optional int64 state_index_start = 3;
+    optional int64 state_index_end = 4;
+    optional string state_handle = 5;
+}
+
+// Tell the workers to perform an action.
+message MatrixOp {
+    optional Indices indices = 1;
+    optional ComplexMatrix matrix = 2;
+}
+
+message KronProd {
+    repeated MatrixOp matrices = 1;
+}
+
+message Measure {
+    optional Indices indices = 1;
+}
+
+message WorkerOperation {
+    optional string job_id = 1;
+    // If this is the last operation, mark this as true. May be sent without op
+    optional bool done = 2;
+    oneof op {
+        KronProd kronprod = 3;
+        Measure measure = 4;
+        bool sync = 5;
+    }
+}
+
+// Workers respond with WorkerConfirm to confirm completion of last operation.
+message WorkerConfirm {
+    optional string job_id = 1;
+}

@@ -1,5 +1,5 @@
 """This serves as a main function to run a worker."""
-from qip.distributed.messages import WorkerSetup, WorkerOperation
+from qip.distributed.proto import WorkerSetup, WorkerOperation
 from qip.distributed.worker.worker_backends import SocketServerBackend, SocketWorkerBackend
 from qip.distributed.formatsock import FormatSocket
 from qip.backend import CythonBackend
