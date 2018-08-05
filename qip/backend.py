@@ -13,30 +13,34 @@ class StateType:
     The state variable should only be accessed by subclasses of Backend which issues the StateType in the first place.
     Clients don't "know" what type StateType.state actually is.
     """
-    def __init__(self, state):
+    def __init__(self, state, arena=None):
         self.state = state
+        self.arena = arena
+
+    def swap(self):
+        if self.arena is not None:
+            self.state, self.arena = self.arena, self.state
 
 
 class Backend:
     def __init__(self, n: int):
         self.n = n
 
-    def make_state(self, *args, **kwargs) -> Tuple[StateType, StateType]:
+    def make_state(self, *args, **kwargs) -> StateType:
         raise NotImplemented("make_state not implemented by base class")
 
-    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], vec: StateType, n: int,
-                       outputarray: StateType) -> None:
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int) -> None:
         raise NotImplemented("kronselect_dot not implemented by base class")
 
     def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
-                   vec: StateType, n: int, output: StateType) -> None:
+                   state: StateType, n: int) -> None:
         raise NotImplemented("func_apply not implemented by base class")
 
-    def measure(self, indices: Sequence[int], n: int, vec: StateType, out: StateType, measured: Optional[int] = None,
-                measured_prob: Optional[float] = None) -> Tuple[StateType, StateType, int]:
+    def measure(self, indices: Sequence[int], n: int, state: StateType, measured: Optional[int] = None,
+                measured_prob: Optional[float] = None) -> Tuple[StateType, int]:
         raise NotImplemented("measure not implemented by base class")
 
-    def measure_probabilities(self, indices: Sequence[int], n: int, vec: StateType) -> Sequence[float]:
+    def measure_probabilities(self, indices: Sequence[int], n: int, state: StateType) -> Sequence[float]:
         raise NotImplemented("measure_probabilities not implemented by base class")
 
 
@@ -45,7 +49,7 @@ class CythonBackend(Backend):
         super().__init__(n)
 
     def make_state(self, index_groups: Sequence[Sequence[int]], feed_list: Mapping[Sequence[int], InitialState],
-                   state: InitialState = None, statetype: type = numpy.complex128) -> Tuple[StateType, StateType]:
+                   state: InitialState = None, statetype: type = numpy.complex128) -> StateType:
         if state is None:
             state = numpy.zeros(2 ** self.n, dtype=statetype)
 
@@ -65,20 +69,21 @@ class CythonBackend(Backend):
             raise ValueError("State size must be 2**n")
         elif type(state) == list:
             state = numpy.array(state)
-        return StateType(state), StateType(state.copy())
+        return StateType(state, state.copy())
 
-    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], vec: StateType, n: int,
-                       outputarray: StateType) -> None:
-        kronselect_dot(mats, vec.state, n, outputarray.state, dot_impl=cdot_loop)
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int) -> None:
+        kronselect_dot(mats, state.state, n, state.arena, dot_impl=cdot_loop)
+        state.swap()
 
     def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
-                   vec: StateType, n: int, output: StateType) -> None:
-        func_apply(reg1_indices, reg2_indices, func, vec.state, n, output.state)
+                   state: StateType, n: int) -> None:
+        func_apply(reg1_indices, reg2_indices, func, state.state, n, state.arena)
+        state.swap()
 
-    def measure(self, indices: Sequence[int], n: int, vec: StateType, out: StateType, measured: Optional[int] = None,
-                measured_prob: Optional[float] = None) -> Tuple[StateType, StateType, int]:
-        inputvals = vec.state
-        arena = out.state
+    def measure(self, indices: Sequence[int], n: int, state: StateType, measured: Optional[int] = None,
+                measured_prob: Optional[float] = None) -> Tuple[StateType, int]:
+        inputvals = state.state
+        arena = state.arena
 
         bits = measure(indices, n, inputvals, arena, measured=measured, measured_prob=measured_prob)
 
@@ -93,7 +98,7 @@ class CythonBackend(Backend):
         new_arena = arena[:arena.shape[0] >> self.n]
         del arena
 
-        return StateType(new_arena), StateType(new_inputvals), bits
+        return StateType(new_arena, new_inputvals), bits
 
-    def measure_probabilities(self, indices: Sequence[int], n: int, vec: StateType) -> Sequence[float]:
-        return measure_probabilities(indices, n, vec.state)
+    def measure_probabilities(self, indices: Sequence[int], n: int, state: StateType) -> Sequence[float]:
+        return measure_probabilities(indices, n, state.state)

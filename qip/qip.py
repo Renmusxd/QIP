@@ -145,13 +145,13 @@ class Measure(Qubit):
             for item in inputs:
                 item.set_sink(self)
 
-    def feed_indices(self, inputvals: StateType, index_groups: Sequence[Sequence[int]], n: int, arena: StateType,
-                     backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
+                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        new_arena, new_inputvals, bits = backend.measure(indices, n, inputvals, arena)
+        new_state, bits = backend.measure(indices, n, state)
 
-        return new_arena, new_inputvals, (self.n, bits)
+        return new_state, (self.n, bits)
 
     def remap_index(self, index_map: Mapping[Qubit, Sequence[int]], n: int) -> Mapping[Qubit, Sequence[int]]:
         """
@@ -189,13 +189,13 @@ class StochasticMeasure(Qubit):
             for item in inputs:
                 item.set_sink(self)
 
-    def feed_indices(self, inputvals: StateType, index_groups: Sequence[Sequence[int]], n: int, arena: StateType,
-                     backend: Backend) -> Tuple[StateType, StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
+                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        probs = backend.measure_probabilities(indices, n, inputvals).copy()
+        probs = backend.measure_probabilities(indices, n, state).copy()
 
-        return inputvals, arena, (0, probs)
+        return state, (0, probs)
 
     def __repr__(self) -> str:
         return "SM({})".format(",".join(i.__repr__() for i in self.inputs))
