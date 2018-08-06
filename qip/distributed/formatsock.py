@@ -1,20 +1,22 @@
 import struct
 import sys
 import threading
+import socket
+from typing import Union
 
 
 class FormatSocket:
     SIZE_BYTES = 4
     RECV_SIZE = 8192
 
-    def __init__(self, sock):
+    def __init__(self, sock: socket):
         self.sock = sock
         self.lastbytes = b''
         self.sendlock = threading.Lock()
         self.recvlock = threading.Lock()
         self.datalock = threading.Lock()
 
-    def send(self,msg):
+    def send(self, msg: Union[bytes, str]):
         '''
         Takes str or bytes and produces bytes where the first 4 bytes
         correspond to the message length
@@ -29,7 +31,7 @@ class FormatSocket:
         else:
             raise Exception("msg must be of type bytes or str")
 
-    def closeswapsock(self, newsock):
+    def closeswapsock(self, newsock: socket):
         # Needs both locks to stop other threads from working with socket
         with self.sendlock:
             # Closing should stop any recv that may be happening
@@ -37,12 +39,11 @@ class FormatSocket:
             with self.recvlock:
                 self.sock = newsock
 
-    def recv(self):
+    def recv(self) -> bytes:
         '''
-        Receives bytes from recvable, expects first bytes to be length of message,
+        Receives bytes from wrapped socket, expects first bytes to be length of message,
         then receives that amount of data and returns raw bytes of message
-        :param recvable: Any object with recv(bytes) function
-        :return:
+        :return: message
         '''
         with self.recvlock:
             total_data = self.lastbytes
@@ -71,15 +72,15 @@ class FormatSocket:
             self.lastbytes = msg_data[expected_size:]
             return msg_data[:expected_size]
 
-    def rawsend(self,bs):
+    def rawsend(self, bs: bytes):
         with self.sendlock:
             self.sock.send(bs)
 
-    def rawrecv(self,size):
+    def rawrecv(self, size: int) -> bytes:
         with self.recvlock:
             return self.sock.recv(size)
 
-    def fileno(self):
+    def fileno(self) -> int:
         with self.sendlock:
             return self.sock.fileno()
 
@@ -88,7 +89,7 @@ class FormatSocket:
         with self.sendlock:
             return self.sock.close()
 
-    def settimeout(self, timeout):
+    def settimeout(self, timeout: int):
         with self.sendlock:
             with self.datalock:
                 self.sock.settimeout(timeout)

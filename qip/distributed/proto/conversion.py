@@ -4,15 +4,23 @@ import numpy
 
 
 def indices_to_pbindices(indices: Iterable[int]) -> Indices:
-    pass
+    pbindices = Indices()
+    for index in indices:
+        pbindices.index.append(index)
+    return pbindices
 
 
 def pbindex_to_index(indices: Indices) -> Tuple[int, ...]:
-    pass
+    return tuple(index for index in indices.index)
+
 
 def vec_to_pbvec(vec: Union[Sequence[complex], numpy.ndarray]) -> ComplexVector:
-    pass
+    pbvec = ComplexVector()
+    for cval in vec:
+        vec.real.append(cval.real)
+        vec.imag.append(cval.imag)
+    return pbvec
 
 
-def pbvec_to_vec(vec: ComplexVector) -> numpy.ndarray:
-    pass
+def pbvec_to_vec(vec: ComplexVector, dtype=numpy.complex128) -> numpy.ndarray:
+    return numpy.fromiter(vec.real, dtype=dtype) + 1j*numpy.fromiter(vec.imag, dtype=dtype)

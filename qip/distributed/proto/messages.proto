@@ -27,6 +27,24 @@ message State {
     }
 }
 
+// Network communication
+
+message WorkerInformation {
+    optional int32 n_qubits = 1;
+}
+
+message ClientInformation {
+}
+
+message HostInformation {
+    optional string address = 1;
+    optional int32 port = 2;
+    oneof hosttype {
+        WorkerInformation worker_info = 3;
+        ClientInformation client_info = 4;
+    }
+}
+
 // Use-case specific messages
 
 // Message to send to distributed manager to start worker states
@@ -36,7 +54,7 @@ message StateSetup {
 }
 
 // Response from manager for making a state
-message StateHandler {
+message StateHandle {
     oneof handle {
         string state_handle = 1;
         string error_message = 2;
@@ -49,7 +67,9 @@ message WorkerSetup {
     repeated State states = 2;
     optional int64 state_index_start = 3;
     optional int64 state_index_end = 4;
-    optional string state_handle = 5;
+    optional int64 output_index_start = 5;
+    optional int64 output_index_end = 6;
+    optional string state_handle = 7;
 }
 
 // Tell the workers to perform an action.
@@ -67,6 +87,7 @@ message Measure {
 }
 
 message WorkerOperation {
+    // For client to backend, use state_handle, otherwise make a new temporary job_id
     optional string job_id = 1;
     // If this is the last operation, mark this as true. May be sent without op
     optional bool done = 2;

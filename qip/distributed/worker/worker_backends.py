@@ -5,15 +5,15 @@ class ServerBackend:
     def __init__(self):
         pass
 
-    def receive_setup(self):
+    def receive_setup(self) -> WorkerSetup:
         """Wait for a setup command."""
         raise NotImplemented("Not implemented")
 
-    def receive_operation(self):
+    def receive_operation(self) -> WorkerOperation:
         """Wait for an operation."""
         raise NotImplemented("Not implemented")
 
-    def report_done(self, job_id):
+    def report_done(self, job_id) -> None:
         """Tell the server that the task job_id is done"""
         raise NotImplemented("Not implemented")
 

@@ -1,4 +1,4 @@
-from qip.distributed.proto import StateSetup, StateHandler
+from qip.distributed.proto import StateSetup, StateHandle, HostInformation, ClientInformation
 from qip.distributed.formatsock import FormatSocket
 from qip.distributed.proto.conversion import *
 from qip.backend import Backend, StateType, InitialState
@@ -10,16 +10,22 @@ import ssl
 
 
 class DistributedBackend(Backend):
-    def __init__(self, n, server_host: str, server_port: int = 1708):
+    def __init__(self, n, server_host: str = 'localhost', server_port: int = 1708):
         super().__init__(n)
         self.control_server_addr = (server_host, server_port)
 
         sock = socket.socket()
         sock.connect(self.control_server_addr)
+        # First byte is whether to use ssl or not, all remaining communication is proto based.
         b = sock.recv(1)
         if b != b'\x00':
             sock = ssl.wrap_socket(sock)
         self.socket = FormatSocket(sock)
+
+        # Introduce yourself.
+        host_info = HostInformation()
+        host_info.client_info = ClientInformation()
+        self.socket.send(host_info.SerializeToString())
 
     def make_state(self, index_groups: Sequence[Sequence[int]], feed_list: Mapping[Sequence[int], InitialState],
                    state: InitialState = None, startindex: Optional[int] = None, endindex: Optional[int] = None,
@@ -43,7 +49,7 @@ class DistributedBackend(Backend):
                 pb_state.vector = vec_to_pbvec(initial_state)
 
         self.socket.send(setup_message.SerializeToString())
-        resp = StateHandler.FromString(self.socket.recv())
+        resp = StateHandle.FromString(self.socket.recv())
 
         if resp.has_error_message():
             raise Exception(resp.error_message)

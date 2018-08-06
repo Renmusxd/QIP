@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='distributed',
   syntax='proto2',
   serialized_options=None,
-  serialized_pb=_b('\n\x0emessages.proto\x12\x0b\x64istributed\"3\n\rComplexVector\x12\x10\n\x04real\x18\x01 \x03(\x01\x42\x02\x10\x01\x12\x10\n\x04imag\x18\x02 \x03(\x01\x42\x02\x10\x01\"U\n\rComplexMatrix\x12\x0c\n\x04\x63ols\x18\x01 \x01(\x05\x12\x0c\n\x04rows\x18\x02 \x01(\x05\x12(\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x1a.distributed.ComplexVector\"\x18\n\x07Indices\x12\r\n\x05index\x18\x01 \x03(\x05\"v\n\x05State\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12,\n\x06vector\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexVectorH\x00\x12\x0f\n\x05index\x18\x03 \x01(\x03H\x00\x42\x07\n\x05state\";\n\nStateSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\"I\n\x0cStateHandler\x12\x16\n\x0cstate_handle\x18\x01 \x01(\tH\x00\x12\x17\n\rerror_message\x18\x02 \x01(\tH\x00\x42\x08\n\x06handle\"\x86\x01\n\x0bWorkerSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\x12\x19\n\x11state_index_start\x18\x03 \x01(\x03\x12\x17\n\x0fstate_index_end\x18\x04 \x01(\x03\x12\x14\n\x0cstate_handle\x18\x05 \x01(\t\"]\n\x08MatrixOp\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12*\n\x06matrix\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexMatrix\"3\n\x08KronProd\x12\'\n\x08matrices\x18\x01 \x03(\x0b\x32\x15.distributed.MatrixOp\"0\n\x07Measure\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\"\x99\x01\n\x0fWorkerOperation\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x0c\n\x04\x64one\x18\x02 \x01(\x08\x12)\n\x08kronprod\x18\x03 \x01(\x0b\x32\x15.distributed.KronProdH\x00\x12\'\n\x07measure\x18\x04 \x01(\x0b\x32\x14.distributed.MeasureH\x00\x12\x0e\n\x04sync\x18\x05 \x01(\x08H\x00\x42\x04\n\x02op\"\x1f\n\rWorkerConfirm\x12\x0e\n\x06job_id\x18\x01 \x01(\t')
+  serialized_pb=_b('\n\x0emessages.proto\x12\x0b\x64istributed\"3\n\rComplexVector\x12\x10\n\x04real\x18\x01 \x03(\x01\x42\x02\x10\x01\x12\x10\n\x04imag\x18\x02 \x03(\x01\x42\x02\x10\x01\"U\n\rComplexMatrix\x12\x0c\n\x04\x63ols\x18\x01 \x01(\x05\x12\x0c\n\x04rows\x18\x02 \x01(\x05\x12(\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x1a.distributed.ComplexVector\"\x18\n\x07Indices\x12\r\n\x05index\x18\x01 \x03(\x05\"v\n\x05State\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12,\n\x06vector\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexVectorH\x00\x12\x0f\n\x05index\x18\x03 \x01(\x03H\x00\x42\x07\n\x05state\"%\n\x11WorkerInformation\x12\x10\n\x08n_qubits\x18\x01 \x01(\x05\"\x13\n\x11\x43lientInformation\"\xaa\x01\n\x0fHostInformation\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\x12\x35\n\x0bworker_info\x18\x03 \x01(\x0b\x32\x1e.distributed.WorkerInformationH\x00\x12\x35\n\x0b\x63lient_info\x18\x04 \x01(\x0b\x32\x1e.distributed.ClientInformationH\x00\x42\n\n\x08hosttype\";\n\nStateSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\"H\n\x0bStateHandle\x12\x16\n\x0cstate_handle\x18\x01 \x01(\tH\x00\x12\x17\n\rerror_message\x18\x02 \x01(\tH\x00\x42\x08\n\x06handle\"\x86\x01\n\x0bWorkerSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\x12\x19\n\x11state_index_start\x18\x03 \x01(\x03\x12\x17\n\x0fstate_index_end\x18\x04 \x01(\x03\x12\x14\n\x0cstate_handle\x18\x05 \x01(\t\"]\n\x08MatrixOp\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12*\n\x06matrix\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexMatrix\"3\n\x08KronProd\x12\'\n\x08matrices\x18\x01 \x03(\x0b\x32\x15.distributed.MatrixOp\"0\n\x07Measure\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\"\x99\x01\n\x0fWorkerOperation\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x0c\n\x04\x64one\x18\x02 \x01(\x08\x12)\n\x08kronprod\x18\x03 \x01(\x0b\x32\x15.distributed.KronProdH\x00\x12\'\n\x07measure\x18\x04 \x01(\x0b\x32\x14.distributed.MeasureH\x00\x12\x0e\n\x04sync\x18\x05 \x01(\x08H\x00\x42\x04\n\x02op\"\x1f\n\rWorkerConfirm\x12\x0e\n\x06job_id\x18\x01 \x01(\t')
 )
 
 
@@ -187,6 +187,116 @@ _STATE = _descriptor.Descriptor(
 )
 
 
+_WORKERINFORMATION = _descriptor.Descriptor(
+  name='WorkerInformation',
+  full_name='distributed.WorkerInformation',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='n_qubits', full_name='distributed.WorkerInformation.n_qubits', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=317,
+  serialized_end=354,
+)
+
+
+_CLIENTINFORMATION = _descriptor.Descriptor(
+  name='ClientInformation',
+  full_name='distributed.ClientInformation',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=356,
+  serialized_end=375,
+)
+
+
+_HOSTINFORMATION = _descriptor.Descriptor(
+  name='HostInformation',
+  full_name='distributed.HostInformation',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='address', full_name='distributed.HostInformation.address', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='port', full_name='distributed.HostInformation.port', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='worker_info', full_name='distributed.HostInformation.worker_info', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='client_info', full_name='distributed.HostInformation.client_info', index=3,
+      number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='hosttype', full_name='distributed.HostInformation.hosttype',
+      index=0, containing_type=None, fields=[]),
+  ],
+  serialized_start=378,
+  serialized_end=548,
+)
+
+
 _STATESETUP = _descriptor.Descriptor(
   name='StateSetup',
   full_name='distributed.StateSetup',
@@ -220,27 +330,27 @@ _STATESETUP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=317,
-  serialized_end=376,
+  serialized_start=550,
+  serialized_end=609,
 )
 
 
-_STATEHANDLER = _descriptor.Descriptor(
-  name='StateHandler',
-  full_name='distributed.StateHandler',
+_STATEHANDLE = _descriptor.Descriptor(
+  name='StateHandle',
+  full_name='distributed.StateHandle',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='state_handle', full_name='distributed.StateHandler.state_handle', index=0,
+      name='state_handle', full_name='distributed.StateHandle.state_handle', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='error_message', full_name='distributed.StateHandler.error_message', index=1,
+      name='error_message', full_name='distributed.StateHandle.error_message', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -258,11 +368,11 @@ _STATEHANDLER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
     _descriptor.OneofDescriptor(
-      name='handle', full_name='distributed.StateHandler.handle',
+      name='handle', full_name='distributed.StateHandle.handle',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=378,
-  serialized_end=451,
+  serialized_start=611,
+  serialized_end=683,
 )
 
 
@@ -320,8 +430,8 @@ _WORKERSETUP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=454,
-  serialized_end=588,
+  serialized_start=686,
+  serialized_end=820,
 )
 
 
@@ -358,8 +468,8 @@ _MATRIXOP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=590,
-  serialized_end=683,
+  serialized_start=822,
+  serialized_end=915,
 )
 
 
@@ -389,8 +499,8 @@ _KRONPROD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=685,
-  serialized_end=736,
+  serialized_start=917,
+  serialized_end=968,
 )
 
 
@@ -420,8 +530,8 @@ _MEASURE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=738,
-  serialized_end=786,
+  serialized_start=970,
+  serialized_end=1018,
 )
 
 
@@ -482,8 +592,8 @@ _WORKEROPERATION = _descriptor.Descriptor(
       name='op', full_name='distributed.WorkerOperation.op',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=789,
-  serialized_end=942,
+  serialized_start=1021,
+  serialized_end=1174,
 )
 
 
@@ -513,8 +623,8 @@ _WORKERCONFIRM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=944,
-  serialized_end=975,
+  serialized_start=1176,
+  serialized_end=1207,
 )
 
 _COMPLEXMATRIX.fields_by_name['data'].message_type = _COMPLEXVECTOR
@@ -526,13 +636,21 @@ _STATE.fields_by_name['vector'].containing_oneof = _STATE.oneofs_by_name['state'
 _STATE.oneofs_by_name['state'].fields.append(
   _STATE.fields_by_name['index'])
 _STATE.fields_by_name['index'].containing_oneof = _STATE.oneofs_by_name['state']
+_HOSTINFORMATION.fields_by_name['worker_info'].message_type = _WORKERINFORMATION
+_HOSTINFORMATION.fields_by_name['client_info'].message_type = _CLIENTINFORMATION
+_HOSTINFORMATION.oneofs_by_name['hosttype'].fields.append(
+  _HOSTINFORMATION.fields_by_name['worker_info'])
+_HOSTINFORMATION.fields_by_name['worker_info'].containing_oneof = _HOSTINFORMATION.oneofs_by_name['hosttype']
+_HOSTINFORMATION.oneofs_by_name['hosttype'].fields.append(
+  _HOSTINFORMATION.fields_by_name['client_info'])
+_HOSTINFORMATION.fields_by_name['client_info'].containing_oneof = _HOSTINFORMATION.oneofs_by_name['hosttype']
 _STATESETUP.fields_by_name['states'].message_type = _STATE
-_STATEHANDLER.oneofs_by_name['handle'].fields.append(
-  _STATEHANDLER.fields_by_name['state_handle'])
-_STATEHANDLER.fields_by_name['state_handle'].containing_oneof = _STATEHANDLER.oneofs_by_name['handle']
-_STATEHANDLER.oneofs_by_name['handle'].fields.append(
-  _STATEHANDLER.fields_by_name['error_message'])
-_STATEHANDLER.fields_by_name['error_message'].containing_oneof = _STATEHANDLER.oneofs_by_name['handle']
+_STATEHANDLE.oneofs_by_name['handle'].fields.append(
+  _STATEHANDLE.fields_by_name['state_handle'])
+_STATEHANDLE.fields_by_name['state_handle'].containing_oneof = _STATEHANDLE.oneofs_by_name['handle']
+_STATEHANDLE.oneofs_by_name['handle'].fields.append(
+  _STATEHANDLE.fields_by_name['error_message'])
+_STATEHANDLE.fields_by_name['error_message'].containing_oneof = _STATEHANDLE.oneofs_by_name['handle']
 _WORKERSETUP.fields_by_name['states'].message_type = _STATE
 _MATRIXOP.fields_by_name['indices'].message_type = _INDICES
 _MATRIXOP.fields_by_name['matrix'].message_type = _COMPLEXMATRIX
@@ -553,8 +671,11 @@ DESCRIPTOR.message_types_by_name['ComplexVector'] = _COMPLEXVECTOR
 DESCRIPTOR.message_types_by_name['ComplexMatrix'] = _COMPLEXMATRIX
 DESCRIPTOR.message_types_by_name['Indices'] = _INDICES
 DESCRIPTOR.message_types_by_name['State'] = _STATE
+DESCRIPTOR.message_types_by_name['WorkerInformation'] = _WORKERINFORMATION
+DESCRIPTOR.message_types_by_name['ClientInformation'] = _CLIENTINFORMATION
+DESCRIPTOR.message_types_by_name['HostInformation'] = _HOSTINFORMATION
 DESCRIPTOR.message_types_by_name['StateSetup'] = _STATESETUP
-DESCRIPTOR.message_types_by_name['StateHandler'] = _STATEHANDLER
+DESCRIPTOR.message_types_by_name['StateHandle'] = _STATEHANDLE
 DESCRIPTOR.message_types_by_name['WorkerSetup'] = _WORKERSETUP
 DESCRIPTOR.message_types_by_name['MatrixOp'] = _MATRIXOP
 DESCRIPTOR.message_types_by_name['KronProd'] = _KRONPROD
@@ -591,6 +712,27 @@ State = _reflection.GeneratedProtocolMessageType('State', (_message.Message,), d
   ))
 _sym_db.RegisterMessage(State)
 
+WorkerInformation = _reflection.GeneratedProtocolMessageType('WorkerInformation', (_message.Message,), dict(
+  DESCRIPTOR = _WORKERINFORMATION,
+  __module__ = 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:distributed.WorkerInformation)
+  ))
+_sym_db.RegisterMessage(WorkerInformation)
+
+ClientInformation = _reflection.GeneratedProtocolMessageType('ClientInformation', (_message.Message,), dict(
+  DESCRIPTOR = _CLIENTINFORMATION,
+  __module__ = 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:distributed.ClientInformation)
+  ))
+_sym_db.RegisterMessage(ClientInformation)
+
+HostInformation = _reflection.GeneratedProtocolMessageType('HostInformation', (_message.Message,), dict(
+  DESCRIPTOR = _HOSTINFORMATION,
+  __module__ = 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:distributed.HostInformation)
+  ))
+_sym_db.RegisterMessage(HostInformation)
+
 StateSetup = _reflection.GeneratedProtocolMessageType('StateSetup', (_message.Message,), dict(
   DESCRIPTOR = _STATESETUP,
   __module__ = 'messages_pb2'
@@ -598,12 +740,12 @@ StateSetup = _reflection.GeneratedProtocolMessageType('StateSetup', (_message.Me
   ))
 _sym_db.RegisterMessage(StateSetup)
 
-StateHandler = _reflection.GeneratedProtocolMessageType('StateHandler', (_message.Message,), dict(
-  DESCRIPTOR = _STATEHANDLER,
+StateHandle = _reflection.GeneratedProtocolMessageType('StateHandle', (_message.Message,), dict(
+  DESCRIPTOR = _STATEHANDLE,
   __module__ = 'messages_pb2'
-  # @@protoc_insertion_point(class_scope:distributed.StateHandler)
+  # @@protoc_insertion_point(class_scope:distributed.StateHandle)
   ))
-_sym_db.RegisterMessage(StateHandler)
+_sym_db.RegisterMessage(StateHandle)
 
 WorkerSetup = _reflection.GeneratedProtocolMessageType('WorkerSetup', (_message.Message,), dict(
   DESCRIPTOR = _WORKERSETUP,
