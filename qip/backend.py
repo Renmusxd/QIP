@@ -29,11 +29,13 @@ class Backend:
     def make_state(self, *args, **kwargs) -> StateType:
         raise NotImplemented("make_state not implemented by base class")
 
-    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int) -> None:
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int,
+                       input_offset: int = 0, output_offset: int = 0) -> None:
         raise NotImplemented("kronselect_dot not implemented by base class")
 
     def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
-                   state: StateType, n: int) -> None:
+                   state: StateType, n: int,
+                   input_offset: int = 0, output_offset: int = 0) -> None:
         raise NotImplemented("func_apply not implemented by base class")
 
     def measure(self, indices: Sequence[int], n: int, state: StateType, measured: Optional[int] = None,
@@ -51,16 +53,22 @@ class CythonBackend(Backend):
     def __init__(self, n: int):
         super().__init__(n)
 
-    def make_state(self, index_groups: Sequence[Sequence[int]], feed_list: Mapping[Sequence[int], InitialState],
-                   state: InitialState = None, startindex: Optional[int] = None, endindex: Optional[int] = None,
+    def make_state(self, index_groups: Sequence[Sequence[int]], feed_list: Sequence[InitialState],
+                   state: InitialState = None, 
+                   inputstartindex: Optional[int] = None, inputendindex: Optional[int] = None,
+                   outputstartindex: Optional[int] = None, outputendindex: Optional[int] = None,
                    statetype: type = numpy.complex128) -> StateType:
         if state is None:
-            if startindex is None:
-                startindex = 0
-            if endindex is None:
-                endindex = 2**self.n
+            if inputstartindex is None:
+                inputstartindex = 0
+            if inputendindex is None:
+                inputendindex = 2**self.n
+            if outputstartindex is None:
+                outputstartindex = 0
+            if outputendindex is None:
+                outputendindex = 2**self.n
 
-            state = numpy.zeros(endindex - startindex, dtype=statetype)
+            state = numpy.zeros(inputendindex - inputstartindex, dtype=statetype)
 
             if len(feed_list) == 0:
                 state[0] = 1
@@ -68,7 +76,7 @@ class CythonBackend(Backend):
             # Set all the entries in state to product of matrix entries
             for index, flips in gen_edit_indices(index_groups, self.n - 1):
                 # Skip out of range
-                if index < startindex or index >= endindex:
+                if index < inputstartindex or index >= inputendindex:
                     continue
                 # Make index value
                 state[index] = 1.0
@@ -82,14 +90,19 @@ class CythonBackend(Backend):
             raise ValueError("State size must be 2**n")
         elif type(state) == list:
             state = numpy.array(state)
-        return StateType(state, state.copy())
 
-    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int) -> None:
-        kronselect_dot(mats, state.state, n, state.arena, dot_impl=cdot_loop)
+        arena = numpy.ndarray(outputendindex - outputstartindex, dtype=statetype)
+        return StateType(state, arena)
+
+    def kronselect_dot(self, mats: Mapping[IndexType, MatrixType], state: StateType, n: int,
+                       input_offset: int = 0, output_offset: int = 0) -> None:
+        kronselect_dot(mats, state.state, n, state.arena, dot_impl=cdot_loop,
+                       input_offset=input_offset, output_offset=output_offset)
         state.swap()
 
     def func_apply(self, reg1_indices: Sequence[int], reg2_indices: Sequence[int], func: Callable[[int],int],
-                   state: StateType, n: int) -> None:
+                   state: StateType, n: int,
+                   input_offset: int = 0, output_offset: int = 0) -> None:
         func_apply(reg1_indices, reg2_indices, func, state.state, n, state.arena)
         state.swap()
 

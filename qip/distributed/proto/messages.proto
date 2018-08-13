@@ -10,8 +10,7 @@ message ComplexVector {
 }
 
 message ComplexMatrix {
-    optional int32 cols = 1;
-    optional int32 rows = 2;
+    repeated int32 shape = 1;
     optional ComplexVector data = 3;
 }
 
@@ -34,6 +33,7 @@ message WorkerInformation {
 }
 
 message ClientInformation {
+    optional string name = 1;
 }
 
 message HostInformation {
@@ -61,6 +61,17 @@ message StateHandle {
     }
 }
 
+// Manager needs to tell workers about each other
+message WorkerPartner {
+    optional string job_id = 1;
+    optional string addr = 2;
+    optional int32 port = 3;
+    optional int64 state_index_start = 4;
+    optional int64 state_index_end = 5;
+    optional int64 output_index_start = 6;
+    optional int64 output_index_end = 7;
+}
+
 // Message to send to each worker to make local state
 message WorkerSetup {
     optional int32 n = 1;
@@ -70,12 +81,23 @@ message WorkerSetup {
     optional int64 output_index_start = 5;
     optional int64 output_index_end = 6;
     optional string state_handle = 7;
+
+    repeated WorkerPartner partners = 8;
+
+    enum StateType {
+        COMPLEX128 = 0;
+    }
+    optional StateType statetype = 9;
 }
 
 // Tell the workers to perform an action.
 message MatrixOp {
     optional Indices indices = 1;
-    optional ComplexMatrix matrix = 2;
+    oneof op {
+        ComplexMatrix matrix = 2;
+        MatrixOp controlled_op = 3;
+        bool swap = 4;
+    }
 }
 
 message KronProd {
@@ -89,16 +111,32 @@ message Measure {
 message WorkerOperation {
     // For client to backend, use state_handle, otherwise make a new temporary job_id
     optional string job_id = 1;
-    // If this is the last operation, mark this as true. May be sent without op
-    optional bool done = 2;
     oneof op {
         KronProd kronprod = 3;
         Measure measure = 4;
         bool sync = 5;
+        bool close = 6;
     }
 }
 
 // Workers respond with WorkerConfirm to confirm completion of last operation.
 message WorkerConfirm {
+    oneof msg {
+        string job_id = 1;
+        string error_message = 2;
+    }
+}
+
+// Sync information
+message SyncAccept {
     optional string job_id = 1;
+    optional int32 chunk_size = 2 [default = 2048];
+    optional int32 max_inflight = 3 [default = 4];
+}
+
+message SyncState {
+    optional string job_id = 1;
+    optional int64 rel_start_index = 2;
+    optional ComplexVector data = 3;
+    optional bool done = 4;
 }

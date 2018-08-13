@@ -2,7 +2,7 @@ import struct
 import sys
 import threading
 import socket
-from typing import Union
+from typing import Union, Optional
 
 
 class FormatSocket:
@@ -53,7 +53,7 @@ class FormatSocket:
             expected_size = sys.maxsize
             if len(total_data) > FormatSocket.SIZE_BYTES:
                 size_data = total_data[:FormatSocket.SIZE_BYTES]
-                expected_size = struct.unpack('>i',size_data)[0]
+                expected_size = struct.unpack('>i', size_data)[0]
                 msg_data += total_data[FormatSocket.SIZE_BYTES:]
 
             while len(msg_data) < expected_size:
@@ -64,7 +64,7 @@ class FormatSocket:
                 total_data += sock_data
                 if expected_size == sys.maxsize and len(total_data) > FormatSocket.SIZE_BYTES:
                     size_data = total_data[:FormatSocket.SIZE_BYTES]
-                    expected_size = struct.unpack('>i',size_data)[0]
+                    expected_size = struct.unpack('>i', size_data)[0]
                     msg_data += total_data[FormatSocket.SIZE_BYTES:]
                 else:
                     msg_data += sock_data
@@ -89,7 +89,7 @@ class FormatSocket:
         with self.sendlock:
             return self.sock.close()
 
-    def settimeout(self, timeout: int):
+    def settimeout(self, timeout: Optional[int]):
         with self.sendlock:
             with self.datalock:
                 self.sock.settimeout(timeout)

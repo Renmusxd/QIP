@@ -17,10 +17,6 @@ class ServerBackend:
         """Tell the server that the task job_id is done"""
         raise NotImplemented("Not implemented")
 
-    def receive_sync(self):
-        """Wait for server to tell workers to sync state."""
-        raise NotImplemented("Not implemented")
-
 
 class WorkerBackend:
     def __init__(self):
@@ -44,16 +40,15 @@ class SocketServerBackend(ServerBackend):
         self.serversocket = serversocket
 
     def receive_setup(self):
-        return WorkerSetup.from_json(self.serversocket.recv())
+        return WorkerSetup.FromString(self.serversocket.recv())
 
     def receive_operation(self):
-        return WorkerOperation.from_json(self.serversocket.recv())
+        return WorkerOperation.FromString(self.serversocket.recv())
 
     def report_done(self, job_id):
-        self.serversocket.send(WorkerDone(job_id).to_json())
-
-    def receive_sync(self):
-        return WorkerSyncCommand.from_json(self.serversocket.recv())
+        conf = WorkerConfirm()
+        conf.job_id = job_id
+        self.serversocket.send(conf.SerializeToString())
 
 
 class SocketWorkerBackend(WorkerBackend):
