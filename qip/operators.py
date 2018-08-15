@@ -1,7 +1,7 @@
 from qip.qip import Qubit, OpConstructor
 from qip.qubit_util import QubitOpWrapper
 from qip.util import flatten
-from qip.backend import Backend, MatrixType, StateType, IndexType
+from qip.backend import MatrixType, StateType, IndexType
 import numpy
 from typing import Sequence, Tuple, Mapping, Union, Any, Callable, cast
 
@@ -11,12 +11,12 @@ class MatrixOp(Qubit):
         super().__init__(*inputs, **kwargs)
         self.ms = None
 
-    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
-                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
+                     n: int) -> Tuple[int, int]:
         if self.ms is None:
             self.ms = self.makemats(index_groups)
-        backend.kronselect_dot(self.ms, state, n)
-        return state, (0, 0)
+        state.kronselect_dot(self.ms)
+        return 0, 0
 
     def makemats(self, index_groups: Sequence[Sequence[int]]) -> Mapping[IndexType, MatrixType]:
         """
@@ -263,12 +263,12 @@ class FOp(Qubit):
         self.reg1 = reg1
         self.reg2 = reg2
 
-    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
-                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
+                     n: int) -> Tuple[int, int]:
         reg1 = numpy.array(index_groups[0], dtype=numpy.int32)
         reg2 = numpy.array(index_groups[1], dtype=numpy.int32)
-        backend.func_apply(reg1, reg2, self.func, state, n)
-        return state, (0, 0)
+        state.func_apply(reg1, reg2, self.func, n)
+        return 0, 0
 
     def __repr__(self) -> str:
         return "F({}, {})".format(self.reg1, self.reg2)

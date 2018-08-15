@@ -10,7 +10,7 @@ import uuid
 class Manager:
     INPUT_TIMEOUT = 1
     # TODO smarter allocation
-    WORKER_N = 28
+    WORKER_N = 9
 
     def __init__(self, logger: Callable[[str], None] = print):
         self.logger = logger

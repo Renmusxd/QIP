@@ -1,6 +1,6 @@
 from qip.pipeline import PipelineObject
 from qip.util import flatten
-from qip.backend import StateType, Backend, InitialState
+from qip.backend import StateType, InitialState
 import numpy
 from typing import Sequence, Mapping, Tuple, Any, Callable, Union, Optional, Iterable, Type, cast
 
@@ -145,13 +145,13 @@ class Measure(Qubit):
             for item in inputs:
                 item.set_sink(self)
 
-    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
-                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
+                     n: int) -> Tuple[int, int]:
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        new_state, bits = backend.measure(indices, n, state)
+        bits = state.measure(indices)
 
-        return new_state, (self.n, bits)
+        return self.n, bits
 
     def remap_index(self, index_map: Mapping[Qubit, Sequence[int]], n: int) -> Mapping[Qubit, Sequence[int]]:
         """
@@ -189,13 +189,13 @@ class StochasticMeasure(Qubit):
             for item in inputs:
                 item.set_sink(self)
 
-    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
-                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
+                     n: int) -> Tuple[int, object]:
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        probs = backend.measure_probabilities(indices, n, state).copy()
+        probs = state.measure_probabilities(indices)[:]
 
-        return state, (0, probs)
+        return 0, probs
 
     def __repr__(self) -> str:
         return "SM({})".format(",".join(i.__repr__() for i in self.inputs))

@@ -1,6 +1,6 @@
 import numpy
 from qip.util import flatten
-from qip.backend import Backend, InitialState, StateType, CythonBackend
+from qip.backend import StateType, InitialState, CythonBackend
 from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Iterable
 
 
@@ -16,8 +16,8 @@ class PipelineObject(object):
     def run(self, state: InitialState = None, feed: Mapping['PipelineObject', InitialState] = None, **kwargs):
         return run(self, state=state, feed=feed, **kwargs)
 
-    def feed(self, state: StateType, qbitindex: Mapping['PipelineObject', Sequence[int]], n: int,
-             backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
+    def feed(self, state: StateType, qbitindex: Mapping['PipelineObject', Sequence[int]],
+             n: int) -> Tuple[int, object]:
         """
         Operate on the state of the system.
         :param state: input state
@@ -26,10 +26,10 @@ class PipelineObject(object):
         :param backend: backend to use for matrix operations
         :return: (state, (num classic bits, int bits))
         """
-        return self.feed_indices(state, [qbitindex[q] for q in self.inputs], n, backend)
+        return self.feed_indices(state, [qbitindex[q] for q in self.inputs], n)
 
-    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]], n: int,
-                     backend: Backend) -> Tuple[StateType, Tuple[int, int]]:
+    def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
+                     n: int) -> Tuple[int, object]:
         """
         Operate on the state of the system.
         :param state: input state
@@ -39,7 +39,7 @@ class PipelineObject(object):
         :return: (state, (num classic bits, int bits))
         """
         # Return identity
-        return state, (0, 0)
+        return (0, 0)
 
     def select_index(self, indices: Sequence[int]) -> Sequence[int]:
         """
@@ -68,9 +68,9 @@ class PipelineObject(object):
         return hash(repr(self))
 
 
-def run(*args: PipelineObject,  state: InitialState = None, feed: Mapping[PipelineObject, InitialState] = None,
-        statetype=numpy.complex128, strict: bool = False, backend_constructor: Callable[[int], Backend] = CythonBackend,
-        **kwargs):
+def run(*args: PipelineObject, state: InitialState = None, feed: Mapping[PipelineObject, InitialState] = None,
+        statetype=numpy.complex128, strict: bool = False,
+        backend_constructor: Callable[[int, Sequence[Tuple[int]], Sequence[Sequence[complex]]], StateType] = CythonBackend.make_state, **kwargs):
     """
     Runs pipeline using all qubits in *args. Produces an output state based on input.
     :param args: list of qubits to evaluate
@@ -113,15 +113,13 @@ def run(*args: PipelineObject,  state: InitialState = None, feed: Mapping[Pipeli
         qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
         n += qbit.n
 
-    backend = backend_constructor(n)
-
     feed_index_groups = [qbitindex[qbit] for qbit in qbits]
     feed_states = [feed[qbits[qindex]] for qindex in range(len(qbits))]
 
-    state = backend.make_state(feed_index_groups, feed_states,
-                               state=state, statetype=statetype)
+    state = backend_constructor(n, feed_index_groups, feed_states,
+                                state=state, statetype=statetype)
 
-    return feed_forward(frontier, state, graphnodes, backend)
+    return feed_forward(frontier, state, graphnodes)
 
 
 def get_deps(*args: PipelineObject, feed: Mapping[PipelineObject, InitialState] = None) \
@@ -212,18 +210,17 @@ def run_graph(frontier: Sequence[PipelineObject], graphnodes: AbstractSet[Pipeli
 
 
 class NodeFeeder(GraphAccumulator):
-    def __init__(self, state: StateType, n: int, backend: Backend):
+    def __init__(self, state: StateType, n: int):
         self.state = state
         self.n = n
         self.classic_map = {}
-        self.backend = backend
 
         # TODO make state agnostic version
         # if len(self.state) != 2 ** n:
         #     raise ValueError("Size of state must be 2**n")
 
     def feed(self, qbitindex: Mapping[PipelineObject, Sequence[int]], node: PipelineObject):
-        self.state, (n_bits, bits) = node.feed(self.state, qbitindex, self.n, self.backend)
+        n_bits, bits = node.feed(self.state, qbitindex, self.n)
 
         if n_bits > 0 or bits is not None:
             self.classic_map[node] = bits
@@ -231,11 +228,11 @@ class NodeFeeder(GraphAccumulator):
 
 
 def feed_forward(frontier: Sequence[PipelineObject], state: StateType,
-                 graphnodes: AbstractSet[PipelineObject], backend: Backend):
+                 graphnodes: AbstractSet[PipelineObject]):
     n = sum(f.n for f in frontier)
-    graphacc = NodeFeeder(state, n, backend)
+    graphacc = NodeFeeder(state, n)
     run_graph(frontier, graphnodes, graphacc)
-    return graphacc.state.state, graphacc.classic_map
+    return graphacc.state.get_state(), graphacc.classic_map
 
 
 class PrintFeeder(GraphAccumulator):
