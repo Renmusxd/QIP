@@ -27,19 +27,18 @@ class WorkerInstance:
         self.inputendindex = setup.state_index_end
         self.outputstartindex = setup.output_index_start
         self.outputendindex = setup.output_index_end
-        self.backend = CythonBackend(self.n)
         self.pool = workerpool
         self.logger = logger
         indexgroups = list(pbindex_to_index(state.indices) for state in setup.states)
         feedstates = [get_state_value(state) for state in setup.states]
 
         # Contact other workers and create a backend.
+        # TODO
 
-
-        self.state = self.backend.make_state(indexgroups, feedstates,
-                                             inputstartindex=self.inputstartindex, inputendindex=self.inputendindex,
-                                             outputstartindex=self.outputstartindex, outputendindex=self.outputendindex,
-                                             statetype=pbstatetype_to_statetype(setup.statetype))
+        self.state = CythonBackend.make_state(self.n, indexgroups, feedstates,
+                                              inputstartindex=self.inputstartindex, inputendindex=self.inputendindex,
+                                              outputstartindex=self.outputstartindex, outputendindex=self.outputendindex,
+                                              statetype=pbstatetype_to_statetype(setup.statetype))
 
     def run(self):
         while True:
@@ -56,7 +55,7 @@ class WorkerInstance:
                     indices, mat = pbmatop_to_matop(matop)
                     mats[indices] = mat
 
-                self.backend.kronselect_dot(mats, self.state, self.n,
+                self.state.kronselect_dot(mats,
                                             input_offset=self.inputstartindex,
                                             output_offset=self.outputstartindex)
             elif operation.HasField('measure'):

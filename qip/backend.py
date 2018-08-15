@@ -85,6 +85,9 @@ class CythonBackend(StateType):
     def get_state(self) -> numpy.ndarray:
         return self.state
 
+    def swap(self):
+        self.state, self.arena = self.arena, self.state
+
     def kronselect_dot(self, mats: Mapping[IndexType, MatrixType],
                        input_offset: int = 0, output_offset: int = 0) -> None:
         kronselect_dot(mats, self.state, self.n, self.arena, dot_impl=cdot_loop,
