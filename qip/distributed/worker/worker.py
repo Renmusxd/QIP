@@ -33,7 +33,15 @@ class WorkerInstance:
         feedstates = [get_state_value(state) for state in setup.states]
 
         # Contact other workers and create a backend.
-        # TODO
+        # Should be changed if worker allocations change.
+        if self.inputstartindex != self.outputstartindex:
+            for partner in setup.partners:
+                if partner.state_index_start != partner.output_index_start:
+                    continue
+                if partner.state_index_start == self.inputstartindex or partner.state_index_start == self.outputstartindex:
+                    self.pool.makeConnection(self.job_id, self.inputstartindex, self.inputendindex,
+                                             self.outputstartindex, self.outputendindex, partner)
+
 
         self.state = CythonBackend.make_state(self.n, indexgroups, feedstates,
                                               inputstartindex=self.inputstartindex, inputendindex=self.inputendindex,
@@ -54,10 +62,7 @@ class WorkerInstance:
                 for matop in kronprod.matrices:
                     indices, mat = pbmatop_to_matop(matop)
                     mats[indices] = mat
-
-                self.state.kronselect_dot(mats,
-                                            input_offset=self.inputstartindex,
-                                            output_offset=self.outputstartindex)
+                self.state.kronselect_dot(mats, input_offset=self.inputstartindex, output_offset=self.outputstartindex)
             elif operation.HasField('measure'):
                 raise NotImplemented("Need to do measure sometime...")
             elif operation.HasField('sync'):
@@ -133,8 +138,10 @@ class WorkerPoolServer(Thread):
         self.sock.listen(5)
         while True:
             sock, _ = self.sock.accept()
+            self.logger("[*] Accepting partner...")
             sock = FormatSocket(sock)
             workersetup = WorkerPartner.FromString(sock.recv())
+            self.logger(str(workersetup))
 
             fullkey = (workersetup.state_handle, workersetup.state_index_start, workersetup.state_index_end,
                        workersetup.output_index_start, workersetup.output_index_end)
@@ -199,6 +206,7 @@ class WorkerPoolServer(Thread):
 
     # TODO rewrite as cython/c extension to improve speed.
     def sendState(self, job_id: str, state, sock: socket):
+        self.logger("Sending state")
         syncaccept = SyncAccept.FromString(sock.recv())
         if syncaccept.job_id != job_id:
             raise Exception("Job ids do not match: {}/{}".format(job_id, syncaccept.job_id))
@@ -231,6 +239,7 @@ class WorkerPoolServer(Thread):
 
     # TODO rewrite as cython/c extension to improve speed.
     def receiveState(self, job_id: str, state, sock: socket, overwrite=False, chunk_size=2048, max_inflight=4):
+        self.logger("Receiving state")
         syncaccept = SyncAccept()
         syncaccept.job_id = job_id
         syncaccept.chunk_size = chunk_size
@@ -254,9 +263,9 @@ class WorkerPoolServer(Thread):
             sock.send(syncaccept.SerializeToString())
             running = not syncstate.done
 
-    def makeConnection(self, addr: str, port: int, job_id: str,
-                       myinputstart: int, myinputend: int, myoutputstart: int, myoutputend: int,
-                       theirinputstart: int, theirinputend: int, theiroutputstart: int, theiroutputend: int):
+    def makeConnection(self, job_id: str, myinputstart: int, myinputend: int, myoutputstart: int, myoutputend: int,
+                       partner: WorkerPartner):
+        self.logger("[*] Connecting to: {}".format(str(partner)))
         wp = WorkerPartner()
         wp.job_id = job_id
         wp.state_index_start = myinputstart
@@ -265,13 +274,14 @@ class WorkerPoolServer(Thread):
         wp.output_index_end = myoutputend
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((addr, port))
+        sock.connect((partner.addr, partner.port))
         sock = FormatSocket(sock)
         sock.send(wp.SerializeToString())
 
-        fullkey = (job_id, theirinputstart, theirinputend, theiroutputstart, theiroutputend)
-        inputkey = (job_id, theirinputstart, theirinputend)
-        outputkey = (job_id, theiroutputstart, theiroutputend)
+        fullkey = (job_id, partner.state_index_start, partner.state_index_end,
+                   partner.output_index_start, partner.output_index_end)
+        inputkey = (job_id, partner.state_index_start, partner.state_index_end)
+        outputkey = (job_id, partner.output_index_start, partner.output_index_end)
         with self.workerlock:
             self.workers[fullkey] = sock
 

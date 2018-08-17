@@ -24,7 +24,6 @@ class Manager:
         self.worker_lock = Lock()
         self.pool_lock = Lock()
 
-
     def add_worker(self, workersock: socket, info: HostInformation):
         with self.worker_lock:
             self.free_workers.append(AnnotatedSocket(workersock, info))
@@ -136,6 +135,16 @@ class WorkerPool:
         workersetup.n = self.n
         workersetup.state_handle = job_id
         workersetup.states.extend(setup.states)
+        for (inputstart, inputend), (outputstart, outputend), worker in self.workers:
+            wp = workersetup.partners.add()
+            wp.job_id = job_id
+            wp.addr = worker.info.address
+            wp.port = worker.info.port
+            wp.state_index_start = inputstart
+            wp.state_index_end = inputend
+            wp.output_index_start = outputstart
+            wp.output_index_end = outputend
+
         for (inputstart, inputend), (outputstart, outputend), worker in self.workers:
             workersetup.state_index_start = inputstart
             workersetup.state_index_end = inputend
