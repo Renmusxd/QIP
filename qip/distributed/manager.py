@@ -138,8 +138,8 @@ class WorkerPool:
         for (inputstart, inputend), (outputstart, outputend), worker in self.workers:
             wp = workersetup.partners.add()
             wp.job_id = job_id
-            wp.addr = worker.info.address
-            wp.port = worker.info.port
+            wp.addr = worker.info.worker_info.address
+            wp.port = worker.info.worker_info.port
             wp.state_index_start = inputstart
             wp.state_index_end = inputend
             wp.output_index_start = outputstart

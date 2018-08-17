@@ -111,7 +111,7 @@ def get_state_value(state: State) -> Union[numpy.ndarray, int]:
 
 
 class WorkerPoolServer(Thread):
-    def __init__(self, hostname: str = 'localhost', port: int = 0, logger: Callable[[str], None] = print):
+    def __init__(self, hostname: str = '0.0.0.0', port: int = 0, logger: Callable[[str], None] = print):
         """
         Create a server and pool object for finding connections to other workers.
         :param hostname: address to contact this worker
@@ -119,7 +119,7 @@ class WorkerPoolServer(Thread):
         """
         super().__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.bind(('0.0.0.0', port))
+        self.sock.bind((hostname, port))
         self.addr = hostname
         self.port = self.sock.getsockname()[1]  # don't use port in case it was 0
         # map from (job_id, inputstart, inputend) to [worker_socket]
@@ -136,22 +136,22 @@ class WorkerPoolServer(Thread):
 
     def run(self):
         self.sock.listen(5)
+        self.logger("[*] Listening on {}:{}".format(self.addr, self.port))
         while True:
             sock, _ = self.sock.accept()
-            self.logger("[*] Accepting partner...")
             sock = FormatSocket(sock)
             workersetup = WorkerPartner.FromString(sock.recv())
-            self.logger(str(workersetup))
+            self.logger("[*] Accepting partner:\n{}".format(workersetup))
 
-            fullkey = (workersetup.state_handle, workersetup.state_index_start, workersetup.state_index_end,
+            fullkey = (workersetup.job_id, workersetup.state_index_start, workersetup.state_index_end,
                        workersetup.output_index_start, workersetup.output_index_end)
-            inputkey = (workersetup.state_handle, workersetup.state_index_start, workersetup.state_index_end)
-            outputkey = (workersetup.state_handle, workersetup.output_index_start, workersetup.output_index_end)
+            inputkey = (workersetup.job_id, workersetup.state_index_start, workersetup.state_index_end)
+            outputkey = (workersetup.job_id, workersetup.output_index_start, workersetup.output_index_end)
 
             with self.workerlock:
                 if inputkey not in self.inputrange_workers:
                     self.inputrange_workers[inputkey] = []
-                if outputkey in self.outputrange_workers:
+                if outputkey not in self.outputrange_workers:
                     self.outputrange_workers[outputkey] = []
 
                 self.workers[fullkey] = sock
@@ -165,7 +165,10 @@ class WorkerPoolServer(Thread):
             if sockkey in self.workers:
                 sock = self.workers[sockkey]
         if sock is not None:
+            self.logger("[*] Sending state to {}".format(sockkey))
             self.sendState(job_id, state, sock)
+        else:
+            self.logger("[*] Cannot send - No socket for {}".format(sockkey))
 
     def sendStateToAll(self, job_id: str, state, start: int, end: int, inputdefined=True):
         socks = []
@@ -178,6 +181,7 @@ class WorkerPoolServer(Thread):
             with self.workerlock:
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
+        self.logger("[*] Sending state to {} workers...".format(len(socks)))
         for sock in socks:
             self.sendState(job_id, state, sock)
 
@@ -188,7 +192,10 @@ class WorkerPoolServer(Thread):
             if rangekey in self.workers:
                 sock = self.workers[rangekey]
         if sock is not None:
+            self.logger("[*] Receiving state from {}".format(rangekey))
             self.receiveState(job_id, state, sock, overwrite=True)
+        else:
+            self.logger("[*] Cannot receive - No socket for {}".format(rangekey))
 
     def receiveStateIncrementsFromAll(self, job_id: str, state, start: int, end: int, inputdefined=False):
         socks = []
@@ -201,12 +208,12 @@ class WorkerPoolServer(Thread):
             with self.workerlock:
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
+        self.logger("[*] Receiving state from {} workers...".format(len(socks)))
         for sock in socks:
             self.receiveState(job_id, state, sock, overwrite=False)
 
     # TODO rewrite as cython/c extension to improve speed.
     def sendState(self, job_id: str, state, sock: socket):
-        self.logger("Sending state")
         syncaccept = SyncAccept.FromString(sock.recv())
         if syncaccept.job_id != job_id:
             raise Exception("Job ids do not match: {}/{}".format(job_id, syncaccept.job_id))
@@ -239,7 +246,6 @@ class WorkerPoolServer(Thread):
 
     # TODO rewrite as cython/c extension to improve speed.
     def receiveState(self, job_id: str, state, sock: socket, overwrite=False, chunk_size=2048, max_inflight=4):
-        self.logger("Receiving state")
         syncaccept = SyncAccept()
         syncaccept.job_id = job_id
         syncaccept.chunk_size = chunk_size
@@ -265,7 +271,7 @@ class WorkerPoolServer(Thread):
 
     def makeConnection(self, job_id: str, myinputstart: int, myinputend: int, myoutputstart: int, myoutputend: int,
                        partner: WorkerPartner):
-        self.logger("[*] Connecting to: {}".format(str(partner)))
+        self.logger("[*] Connecting to:\n{}".format(str(partner)))
         wp = WorkerPartner()
         wp.job_id = job_id
         wp.state_index_start = myinputstart
@@ -295,36 +301,44 @@ class WorkerPoolServer(Thread):
 
     def closeConnections(self, job_id: Optional[str] = None):
         with self.workerlock:
-            for rangekey in self.workers:
+            rangekeys = list(self.workers.keys())
+            for rangekey in rangekeys:
                 if job_id is None or job_id == rangekey[0]:
                     self.workers.pop(rangekey).close()
 
-            for inputkey in self.inputrange_workers:
+            inputkeys = list(self.inputrange_workers.keys())
+            for inputkey in inputkeys:
                 if job_id is None or job_id == inputkey[0]:
                     self.inputrange_workers.pop(inputkey)
 
-            for outputkey in self.outputrange_workers:
+            outputkeys = list(self.outputrange_workers.keys())
+            for outputkey in outputkeys:
                 if job_id is None or job_id == outputkey[0]:
                     self.outputrange_workers.pop(outputkey)
 
 
-class WorkerRunner:
-    def __init__(self, addr: str = 'localhost', port: int = 1708, logger: Callable[[str], None] = print):
+class WorkerRunner(Thread):
+    def __init__(self, addr: str = 'localhost', port: int = 1708, bindaddr: str = 'localhost', bindport: int = 0, logger: Callable[[str], None] = print):
+        super().__init__()
         sock = socket.socket()
         sock.connect((addr, port))
         b = sock.recv(1)
         if b != b'\x00':
             sock = ssl.wrap_socket(sock)
         self.socket = FormatSocket(sock)
+
+        self.pool = WorkerPoolServer(bindaddr, bindport, logger=logger)
+        self.pool.start()
+
         workerinfo = HostInformation()
         workerinfo.worker_info.n_qubits = 28
+        workerinfo.worker_info.address = self.pool.addr
+        workerinfo.worker_info.port = self.pool.port
+
         self.socket.send(workerinfo.SerializeToString())
         self.serverapi = SocketServerBackend(self.socket)
         self.addr = addr
         self.port = port
-
-        self.pool = WorkerPoolServer(logger=logger)
-        self.pool.start()
 
         self.logger = logger
 
@@ -341,4 +355,5 @@ class WorkerRunner:
 if __name__ == "__main__":
     host, port = sys.argv[1], int(sys.argv[2])
     wr = WorkerRunner(host, port)
-    wr.run()
+    wr.start()
+    wr.join()
