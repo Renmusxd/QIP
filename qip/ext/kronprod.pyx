@@ -161,7 +161,6 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 
             # Generate valid columns and calculate required bitflips
             for i in range(two_nindices):
-                # Edit colbits
                 for j in range(nindices):
                     indx = flatindices[j]
                     # colbits[indx] = matcol[j]
@@ -249,15 +248,12 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
         int p_index = 0
         double complex vec_val
     with nogil:
+        # Iterating over larger array in order likely better for cache.
         for i in range(iter_num):
             vec_val = vec[i]
             if vec_val == 0.0:
                 continue
-
-            for j in range(len_indices):
-                # index = indices[j]
-                p_index = set_bit(p_index, (len_indices-1) - j,
-                                  get_bit(i, (n-1) - indices[j]))
+            p_index = entwine_bit(len_indices, 0, i, 0, -1)
             p[p_index] = p[p_index] + abs(vec_val)**2
     return measure_p
 
