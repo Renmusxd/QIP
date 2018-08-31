@@ -1,7 +1,6 @@
 from qip.ext.kronprod import cdot_loop
 from qip.ext.kronprod import measure
 from qip.ext.kronprod import measure_probabilities
-from qip.ext.kronprod import soft_measure
 from qip.ext.func_apply import func_apply
 from qip.util import kronselect_dot, gen_edit_indices, InitialState, IndexType, MatrixType
 import numpy
