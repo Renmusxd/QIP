@@ -1,10 +1,11 @@
 from qip.ext.kronprod import cdot_loop
 from qip.ext.kronprod import measure
 from qip.ext.kronprod import measure_probabilities
+from qip.ext.kronprod import soft_measure
 from qip.ext.func_apply import func_apply
 from qip.util import kronselect_dot, gen_edit_indices, InitialState, IndexType, MatrixType
 import numpy
-from typing import Union, Sequence, Any, Tuple, Mapping, Callable, Optional, MutableSequence, cast
+from typing import Sequence, Mapping, Callable, Optional
 
 
 class StateType:

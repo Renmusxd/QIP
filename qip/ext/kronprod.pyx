@@ -241,13 +241,13 @@ cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
 @cython.wraparound(False)
 def measure_probabilities(int[:] indices, int n, double complex[:] vec):
     measure_p = np.zeros(shape=(2**len(indices),), dtype=np.float64)
-    cdef double[:] p = measure_p
-
-    cdef int len_indices = indices.shape[0]
-    cdef int iter_num = 2**n
-    cdef int i, j
-    cdef int p_index = 0
-    cdef double complex vec_val
+    cdef:
+        double[:] p = measure_p
+        int len_indices = indices.shape[0]
+        int iter_num = 2**n
+        int i, j
+        int p_index = 0
+        double complex vec_val
     with nogil:
         for i in range(iter_num):
             vec_val = vec[i]
@@ -258,8 +258,66 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
                 # index = indices[j]
                 p_index = set_bit(p_index, (len_indices-1) - j,
                                   get_bit(i, (n-1) - indices[j]))
-            p[p_index] = p[p_index] + abs(vec_val.conjugate() * vec_val)
+            p[p_index] = p[p_index] + abs(vec_val)**2
     return measure_p
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def prob_magnitude(double complex[:] vec):
+    cdef int i
+    cdef double acc
+    with nogil:
+        for i in range(vec.shape[0]):
+            acc += abs(vec[i])**2
+    return acc
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None):
+    cdef:
+        int iter_num = 2**vec.shape[0]
+        int len_indices = indices.shape[0]
+        int len_remaining_indices = n - len_indices
+        int n_measured_indices = 2**len_indices
+        int n_unmeasured_indices = 2**len_remaining_indices
+        double[:] measure_probs
+        double r, acc
+        int i, j, p_index, p_index_index
+        int m = 2**indices.shape[0] - 1
+        int[:] to_measure
+        int row_mask = 0
+
+    if measured is None:
+        to_measure = np.arange(0, n_measured_indices, dtype=np.int32)
+    else:
+        to_measure = np.arange(measured, measured+1, dtype=np.int32)
+
+    r = random.random()
+    # If only looking at subsection of wavefunction
+    if indices.shape[0] < 2**n:
+        r = r * prob_magnitude(vec)
+
+    with nogil:
+        for i in range(len_indices):
+            row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
+
+        for p_index_index in range(to_measure.shape[0]):
+            p_index = to_measure[p_index_index]
+
+            acc = 0
+            for i in range(n_unmeasured_indices):
+                vec_index = entwine_bit(len_indices, len_remaining_indices, p_index, i, row_mask)
+                acc += abs(vec[vec_index])**2
+
+            r -= acc
+            if r <= 0:
+                # p_index and acc are set to correct values
+                # can't return here because they aren't python objects and we are in nogil
+                break
+        # If finished loop without break then variables are set to last p_index and last acc -> correct output.
+    return p_index, acc
 
 
 @cython.boundscheck(False)
@@ -272,29 +330,24 @@ def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out,
         if not 0.0 < measured_prob <= 1.0:
             raise ValueError("measured_prob must be 0 < p <= 1")
 
-    cdef int i
-    cdef double r
-    if measured_prob is None or measured is None:
-        measure_probs = measure_probabilities(indices, n, vec)
-        if measured is None:
-            r = random.random()
-            for i in range(2**indices.shape[0]):
-                r -= measure_probs[i]
-                if r <= 0:
-                    break
-            measured = i
-        measured_prob = measure_probs[measured]
+    cdef:
+        int m
+        double p
+        int i
+        int n_indices = indices.shape[0]
+        int n_non_indices = n - n_indices
+        int n_out = 2**(n - n_indices)
+        int vec_row
+        int row_mask = 0
+        int indices_inc, non_indices_inc
+        double mult_p
 
-    cdef int m = measured
-    cdef double p = measured_prob
-    cdef double mult_p = np.sqrt(1.0 / p)
+    if measured is None or measured_prob is None:
+        m, p = soft_measure(indices, n, vec, measured=measured)
+    else:
+        m, p = measured, measured_prob
+    mult_p = np.sqrt(1.0 / p)
 
-    cdef int n_indices = indices.shape[0]
-    cdef int n_non_indices = n - n_indices
-    cdef int n_out = 2**(n - n_indices)
-    cdef int vec_row
-    cdef int row_mask = 0
-    cdef int indices_inc, non_indices_inc
     with nogil:
         for i in range(n_indices):
             row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
