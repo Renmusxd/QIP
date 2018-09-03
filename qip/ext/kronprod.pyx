@@ -204,8 +204,6 @@ def cdot_loop(int[:,:] indexgroups, matrices,
 cdef double complex calc_mat_entry(MatStruct mstruct, int mati, int matj) nogil:
     """
     Calculate the value of the element at mstruct[mati,matj]
-    Note: this method should perform better with nogil but actually performs worse. 
-    Running with gil for now, will attempt fix later.
     :param mstruct: struct containing matrix information
     :param mati: row index
     :param matj: column index
