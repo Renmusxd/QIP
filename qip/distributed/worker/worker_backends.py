@@ -1,4 +1,5 @@
 from qip.distributed.proto import WorkerSetup, WorkerOperation, WorkerConfirm
+from typing import Optional
 
 
 class ServerBackend:
@@ -13,8 +14,12 @@ class ServerBackend:
         """Wait for an operation."""
         raise NotImplemented("Not implemented")
 
-    def report_done(self, job_id) -> None:
+    def report_done(self, job_id: str) -> None:
         """Tell the server that the task job_id is done"""
+        raise NotImplemented("Not implemented")
+
+    def report_probability(self, job_id: str, measured_prob: Optional[float] = None,
+                           measured_bits: Optional[int] = None):
         raise NotImplemented("Not implemented")
 
 
@@ -45,9 +50,17 @@ class SocketServerBackend(ServerBackend):
     def receive_operation(self):
         return WorkerOperation.FromString(self.serversocket.recv())
 
-    def report_done(self, job_id):
+    def report_done(self, job_id: str):
         conf = WorkerConfirm()
         conf.job_id = job_id
+        self.serversocket.send(conf.SerializeToString())
+
+    def report_probability(self, job_id: str, measured_prob: Optional[float] = None,
+                           measured_bits: Optional[int] = None):
+        conf = WorkerConfirm()
+        conf.job_id = job_id
+        conf.measure_result.measured_bits = measured_bits
+        conf.measure_result.measured_prob = measured_prob
         self.serversocket.send(conf.SerializeToString())
 
 

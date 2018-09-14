@@ -106,8 +106,18 @@ message KronProd {
     repeated MatrixOp matrices = 1;
 }
 
+message MeasureResult {
+    optional int32 measured_bits = 1;
+    optional double measured_prob = 2;
+}
+
 message Measure {
     optional Indices indices = 1;
+    optional MeasureResult measure_result = 2;
+}
+
+message Sync {
+    optional int32 reduce_workers_to = 1 [default = -1];
 }
 
 message WorkerOperation {
@@ -116,8 +126,9 @@ message WorkerOperation {
     oneof op {
         KronProd kronprod = 3;
         Measure measure = 4;
-        bool sync = 5;
-        bool close = 6;
+        bool total_prob = 5;
+        Sync sync = 6;
+        bool close = 7;
     }
 }
 
@@ -127,6 +138,7 @@ message WorkerConfirm {
         string job_id = 1;
         string error_message = 2;
     }
+    optional MeasureResult measure_result = 3;
 }
 
 // Sync information

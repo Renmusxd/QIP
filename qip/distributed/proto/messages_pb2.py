@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='messages.proto',
   package='distributed',
   syntax='proto2',
-  serialized_pb=_b('\n\x0emessages.proto\x12\x0b\x64istributed\"3\n\rComplexVector\x12\x10\n\x04real\x18\x01 \x03(\x01\x42\x02\x10\x01\x12\x10\n\x04imag\x18\x02 \x03(\x01\x42\x02\x10\x01\"H\n\rComplexMatrix\x12\r\n\x05shape\x18\x01 \x03(\x05\x12(\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x1a.distributed.ComplexVector\"\x18\n\x07Indices\x12\r\n\x05index\x18\x01 \x03(\x05\"v\n\x05State\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12,\n\x06vector\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexVectorH\x00\x12\x0f\n\x05index\x18\x03 \x01(\x03H\x00\x42\x07\n\x05state\"D\n\x11WorkerInformation\x12\x10\n\x08n_qubits\x18\x01 \x01(\x05\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\x05\"!\n\x11\x43lientInformation\x12\x0c\n\x04name\x18\x01 \x01(\t\"\xaa\x01\n\x0fHostInformation\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\x12\x35\n\x0bworker_info\x18\x03 \x01(\x0b\x32\x1e.distributed.WorkerInformationH\x00\x12\x35\n\x0b\x63lient_info\x18\x04 \x01(\x0b\x32\x1e.distributed.ClientInformationH\x00\x42\n\n\x08hosttype\";\n\nStateSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\"H\n\x0bStateHandle\x12\x16\n\x0cstate_handle\x18\x01 \x01(\tH\x00\x12\x17\n\rerror_message\x18\x02 \x01(\tH\x00\x42\x08\n\x06handle\"\xa5\x01\n\rWorkerPartner\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x0c\n\x04\x61\x64\x64r\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\x05\x12\x19\n\x11state_index_start\x18\x04 \x01(\x03\x12\x17\n\x0fstate_index_end\x18\x05 \x01(\x03\x12\x1a\n\x12output_index_start\x18\x06 \x01(\x03\x12\x18\n\x10output_index_end\x18\x07 \x01(\x03\"\xbe\x02\n\x0bWorkerSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\x12\x19\n\x11state_index_start\x18\x03 \x01(\x03\x12\x17\n\x0fstate_index_end\x18\x04 \x01(\x03\x12\x1a\n\x12output_index_start\x18\x05 \x01(\x03\x12\x18\n\x10output_index_end\x18\x06 \x01(\x03\x12\x14\n\x0cstate_handle\x18\x07 \x01(\t\x12,\n\x08partners\x18\x08 \x03(\x0b\x32\x1a.distributed.WorkerPartner\x12\x35\n\tstatetype\x18\t \x01(\x0e\x32\".distributed.WorkerSetup.StateType\"\x1b\n\tStateType\x12\x0e\n\nCOMPLEX128\x10\x00\"\xa5\x01\n\x08MatrixOp\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12,\n\x06matrix\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexMatrixH\x00\x12.\n\rcontrolled_op\x18\x03 \x01(\x0b\x32\x15.distributed.MatrixOpH\x00\x12\x0e\n\x04swap\x18\x04 \x01(\x08H\x00\x42\x04\n\x02op\"3\n\x08KronProd\x12\'\n\x08matrices\x18\x01 \x03(\x0b\x32\x15.distributed.MatrixOp\"0\n\x07Measure\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\"\x9c\x01\n\x0fWorkerOperation\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12)\n\x08kronprod\x18\x03 \x01(\x0b\x32\x15.distributed.KronProdH\x00\x12\'\n\x07measure\x18\x04 \x01(\x0b\x32\x14.distributed.MeasureH\x00\x12\x0e\n\x04sync\x18\x05 \x01(\x08H\x00\x12\x0f\n\x05\x63lose\x18\x06 \x01(\x08H\x00\x42\x04\n\x02op\"A\n\rWorkerConfirm\x12\x10\n\x06job_id\x18\x01 \x01(\tH\x00\x12\x17\n\rerror_message\x18\x02 \x01(\tH\x00\x42\x05\n\x03msg\"O\n\nSyncAccept\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x18\n\nchunk_size\x18\x02 \x01(\x05:\x04\x32\x30\x34\x38\x12\x17\n\x0cmax_inflight\x18\x03 \x01(\x05:\x01\x34\"l\n\tSyncState\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x17\n\x0frel_start_index\x18\x02 \x01(\x03\x12(\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x1a.distributed.ComplexVector\x12\x0c\n\x04\x64one\x18\x04 \x01(\x08')
+  serialized_pb=_b('\n\x0emessages.proto\x12\x0b\x64istributed\"3\n\rComplexVector\x12\x10\n\x04real\x18\x01 \x03(\x01\x42\x02\x10\x01\x12\x10\n\x04imag\x18\x02 \x03(\x01\x42\x02\x10\x01\"H\n\rComplexMatrix\x12\r\n\x05shape\x18\x01 \x03(\x05\x12(\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x1a.distributed.ComplexVector\"\x18\n\x07Indices\x12\r\n\x05index\x18\x01 \x03(\x05\"v\n\x05State\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12,\n\x06vector\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexVectorH\x00\x12\x0f\n\x05index\x18\x03 \x01(\x03H\x00\x42\x07\n\x05state\"D\n\x11WorkerInformation\x12\x10\n\x08n_qubits\x18\x01 \x01(\x05\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\x05\"!\n\x11\x43lientInformation\x12\x0c\n\x04name\x18\x01 \x01(\t\"\xaa\x01\n\x0fHostInformation\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\x12\x35\n\x0bworker_info\x18\x03 \x01(\x0b\x32\x1e.distributed.WorkerInformationH\x00\x12\x35\n\x0b\x63lient_info\x18\x04 \x01(\x0b\x32\x1e.distributed.ClientInformationH\x00\x42\n\n\x08hosttype\";\n\nStateSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\"H\n\x0bStateHandle\x12\x16\n\x0cstate_handle\x18\x01 \x01(\tH\x00\x12\x17\n\rerror_message\x18\x02 \x01(\tH\x00\x42\x08\n\x06handle\"\xa5\x01\n\rWorkerPartner\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x0c\n\x04\x61\x64\x64r\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\x05\x12\x19\n\x11state_index_start\x18\x04 \x01(\x03\x12\x17\n\x0fstate_index_end\x18\x05 \x01(\x03\x12\x1a\n\x12output_index_start\x18\x06 \x01(\x03\x12\x18\n\x10output_index_end\x18\x07 \x01(\x03\"\xbe\x02\n\x0bWorkerSetup\x12\t\n\x01n\x18\x01 \x01(\x05\x12\"\n\x06states\x18\x02 \x03(\x0b\x32\x12.distributed.State\x12\x19\n\x11state_index_start\x18\x03 \x01(\x03\x12\x17\n\x0fstate_index_end\x18\x04 \x01(\x03\x12\x1a\n\x12output_index_start\x18\x05 \x01(\x03\x12\x18\n\x10output_index_end\x18\x06 \x01(\x03\x12\x14\n\x0cstate_handle\x18\x07 \x01(\t\x12,\n\x08partners\x18\x08 \x03(\x0b\x32\x1a.distributed.WorkerPartner\x12\x35\n\tstatetype\x18\t \x01(\x0e\x32\".distributed.WorkerSetup.StateType\"\x1b\n\tStateType\x12\x0e\n\nCOMPLEX128\x10\x00\"\xa5\x01\n\x08MatrixOp\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12,\n\x06matrix\x18\x02 \x01(\x0b\x32\x1a.distributed.ComplexMatrixH\x00\x12.\n\rcontrolled_op\x18\x03 \x01(\x0b\x32\x15.distributed.MatrixOpH\x00\x12\x0e\n\x04swap\x18\x04 \x01(\x08H\x00\x42\x04\n\x02op\"3\n\x08KronProd\x12\'\n\x08matrices\x18\x01 \x03(\x0b\x32\x15.distributed.MatrixOp\"=\n\rMeasureResult\x12\x15\n\rmeasured_bits\x18\x01 \x01(\x05\x12\x15\n\rmeasured_prob\x18\x02 \x01(\x01\"d\n\x07Measure\x12%\n\x07indices\x18\x01 \x01(\x0b\x32\x14.distributed.Indices\x12\x32\n\x0emeasure_result\x18\x02 \x01(\x0b\x32\x1a.distributed.MeasureResult\"\xb2\x01\n\x0fWorkerOperation\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12)\n\x08kronprod\x18\x03 \x01(\x0b\x32\x15.distributed.KronProdH\x00\x12\'\n\x07measure\x18\x04 \x01(\x0b\x32\x14.distributed.MeasureH\x00\x12\x14\n\ntotal_prob\x18\x05 \x01(\x08H\x00\x12\x0e\n\x04sync\x18\x06 \x01(\x08H\x00\x12\x0f\n\x05\x63lose\x18\x07 \x01(\x08H\x00\x42\x04\n\x02op\"u\n\rWorkerConfirm\x12\x10\n\x06job_id\x18\x01 \x01(\tH\x00\x12\x17\n\rerror_message\x18\x02 \x01(\tH\x00\x12\x32\n\x0emeasure_result\x18\x03 \x01(\x0b\x32\x1a.distributed.MeasureResultB\x05\n\x03msg\"O\n\nSyncAccept\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x18\n\nchunk_size\x18\x02 \x01(\x05:\x04\x32\x30\x34\x38\x12\x17\n\x0cmax_inflight\x18\x03 \x01(\x05:\x01\x34\"l\n\tSyncState\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x17\n\x0frel_start_index\x18\x02 \x01(\x03\x12(\n\x04\x64\x61ta\x18\x03 \x01(\x0b\x32\x1a.distributed.ComplexVector\x12\x0c\n\x04\x64one\x18\x04 \x01(\x08')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -656,17 +656,24 @@ _KRONPROD = _descriptor.Descriptor(
 )
 
 
-_MEASURE = _descriptor.Descriptor(
-  name='Measure',
-  full_name='distributed.Measure',
+_MEASURERESULT = _descriptor.Descriptor(
+  name='MeasureResult',
+  full_name='distributed.MeasureResult',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='indices', full_name='distributed.Measure.indices', index=0,
-      number=1, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
+      name='measured_bits', full_name='distributed.MeasureResult.measured_bits', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='measured_prob', full_name='distributed.MeasureResult.measured_prob', index=1,
+      number=2, type=1, cpp_type=5, label=1,
+      has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -683,7 +690,45 @@ _MEASURE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=1427,
-  serialized_end=1475,
+  serialized_end=1488,
+)
+
+
+_MEASURE = _descriptor.Descriptor(
+  name='Measure',
+  full_name='distributed.Measure',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='indices', full_name='distributed.Measure.indices', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='measure_result', full_name='distributed.Measure.measure_result', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1490,
+  serialized_end=1590,
 )
 
 
@@ -716,15 +761,22 @@ _WORKEROPERATION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='sync', full_name='distributed.WorkerOperation.sync', index=3,
+      name='total_prob', full_name='distributed.WorkerOperation.total_prob', index=3,
       number=5, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='close', full_name='distributed.WorkerOperation.close', index=4,
+      name='sync', full_name='distributed.WorkerOperation.sync', index=4,
       number=6, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='close', full_name='distributed.WorkerOperation.close', index=5,
+      number=7, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -744,8 +796,8 @@ _WORKEROPERATION = _descriptor.Descriptor(
       name='op', full_name='distributed.WorkerOperation.op',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1478,
-  serialized_end=1634,
+  serialized_start=1593,
+  serialized_end=1771,
 )
 
 
@@ -770,6 +822,13 @@ _WORKERCONFIRM = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='measure_result', full_name='distributed.WorkerConfirm.measure_result', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -785,8 +844,8 @@ _WORKERCONFIRM = _descriptor.Descriptor(
       name='msg', full_name='distributed.WorkerConfirm.msg',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1636,
-  serialized_end=1701,
+  serialized_start=1773,
+  serialized_end=1890,
 )
 
 
@@ -830,8 +889,8 @@ _SYNCACCEPT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1703,
-  serialized_end=1782,
+  serialized_start=1892,
+  serialized_end=1971,
 )
 
 
@@ -882,8 +941,8 @@ _SYNCSTATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1784,
-  serialized_end=1892,
+  serialized_start=1973,
+  serialized_end=2081,
 )
 
 _COMPLEXMATRIX.fields_by_name['data'].message_type = _COMPLEXVECTOR
@@ -928,6 +987,7 @@ _MATRIXOP.oneofs_by_name['op'].fields.append(
 _MATRIXOP.fields_by_name['swap'].containing_oneof = _MATRIXOP.oneofs_by_name['op']
 _KRONPROD.fields_by_name['matrices'].message_type = _MATRIXOP
 _MEASURE.fields_by_name['indices'].message_type = _INDICES
+_MEASURE.fields_by_name['measure_result'].message_type = _MEASURERESULT
 _WORKEROPERATION.fields_by_name['kronprod'].message_type = _KRONPROD
 _WORKEROPERATION.fields_by_name['measure'].message_type = _MEASURE
 _WORKEROPERATION.oneofs_by_name['op'].fields.append(
@@ -937,11 +997,15 @@ _WORKEROPERATION.oneofs_by_name['op'].fields.append(
   _WORKEROPERATION.fields_by_name['measure'])
 _WORKEROPERATION.fields_by_name['measure'].containing_oneof = _WORKEROPERATION.oneofs_by_name['op']
 _WORKEROPERATION.oneofs_by_name['op'].fields.append(
+  _WORKEROPERATION.fields_by_name['total_prob'])
+_WORKEROPERATION.fields_by_name['total_prob'].containing_oneof = _WORKEROPERATION.oneofs_by_name['op']
+_WORKEROPERATION.oneofs_by_name['op'].fields.append(
   _WORKEROPERATION.fields_by_name['sync'])
 _WORKEROPERATION.fields_by_name['sync'].containing_oneof = _WORKEROPERATION.oneofs_by_name['op']
 _WORKEROPERATION.oneofs_by_name['op'].fields.append(
   _WORKEROPERATION.fields_by_name['close'])
 _WORKEROPERATION.fields_by_name['close'].containing_oneof = _WORKEROPERATION.oneofs_by_name['op']
+_WORKERCONFIRM.fields_by_name['measure_result'].message_type = _MEASURERESULT
 _WORKERCONFIRM.oneofs_by_name['msg'].fields.append(
   _WORKERCONFIRM.fields_by_name['job_id'])
 _WORKERCONFIRM.fields_by_name['job_id'].containing_oneof = _WORKERCONFIRM.oneofs_by_name['msg']
@@ -962,6 +1026,7 @@ DESCRIPTOR.message_types_by_name['WorkerPartner'] = _WORKERPARTNER
 DESCRIPTOR.message_types_by_name['WorkerSetup'] = _WORKERSETUP
 DESCRIPTOR.message_types_by_name['MatrixOp'] = _MATRIXOP
 DESCRIPTOR.message_types_by_name['KronProd'] = _KRONPROD
+DESCRIPTOR.message_types_by_name['MeasureResult'] = _MEASURERESULT
 DESCRIPTOR.message_types_by_name['Measure'] = _MEASURE
 DESCRIPTOR.message_types_by_name['WorkerOperation'] = _WORKEROPERATION
 DESCRIPTOR.message_types_by_name['WorkerConfirm'] = _WORKERCONFIRM
@@ -1058,6 +1123,13 @@ KronProd = _reflection.GeneratedProtocolMessageType('KronProd', (_message.Messag
   # @@protoc_insertion_point(class_scope:distributed.KronProd)
   ))
 _sym_db.RegisterMessage(KronProd)
+
+MeasureResult = _reflection.GeneratedProtocolMessageType('MeasureResult', (_message.Message,), dict(
+  DESCRIPTOR = _MEASURERESULT,
+  __module__ = 'messages_pb2'
+  # @@protoc_insertion_point(class_scope:distributed.MeasureResult)
+  ))
+_sym_db.RegisterMessage(MeasureResult)
 
 Measure = _reflection.GeneratedProtocolMessageType('Measure', (_message.Message,), dict(
   DESCRIPTOR = _MEASURE,

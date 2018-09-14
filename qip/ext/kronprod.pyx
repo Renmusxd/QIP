@@ -269,7 +269,7 @@ def prob_magnitude(double complex[:] vec):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None):
+def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None, int input_offset=0):
     cdef:
         int iter_num = 2**vec.shape[0]
         int len_indices = indices.shape[0]
@@ -280,13 +280,16 @@ def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None):
         double r, acc
         int i, j, p_index, p_index_index
         int m = 2**indices.shape[0] - 1
-        int[:] to_measure
+        int to_measure_low, to_measure_high
         int row_mask = 0
+        int vec_index
 
     if measured is None:
-        to_measure = np.arange(0, n_measured_indices, dtype=np.int32)
+        to_measure_low = 0
+        to_measure_high = n_measured_indices
     else:
-        to_measure = np.arange(measured, measured+1, dtype=np.int32)
+        to_measure_low = measured
+        to_measure_high = measured + 1
 
     r = random.random()
     # If only looking at subsection of wavefunction
@@ -297,14 +300,12 @@ def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None):
         for i in range(len_indices):
             row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
 
-        for p_index_index in range(to_measure.shape[0]):
-            p_index = to_measure[p_index_index]
-
+        for p_index in range(to_measure_low, to_measure_high):
             acc = 0
             for i in range(n_unmeasured_indices):
                 vec_index = entwine_bit(len_indices, len_remaining_indices, p_index, i, row_mask)
-                acc += abs(vec[vec_index])**2
-
+                if input_offset <= vec_index < vec.shape[0] + input_offset:
+                    acc += abs(vec[vec_index - input_offset])**2
             r -= acc
             if r <= 0:
                 # p_index and acc are set to correct values
@@ -316,7 +317,8 @@ def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out, measured=None, measured_prob=None):
+def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out,
+            int input_offset = 0, int output_offset = 0, measured=None, measured_prob=None):
     if measured is not None:
         if not (0 <= measured < 2**indices.shape[0]):
             raise ValueError("Measured value must be less than 2**len(indices)")
@@ -330,14 +332,14 @@ def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out,
         int i
         int n_indices = indices.shape[0]
         int n_non_indices = n - n_indices
-        int n_out = 2**(n - n_indices)
+        int n_out = out.shape[0]
         int vec_row
         int row_mask = 0
         int indices_inc, non_indices_inc
         double mult_p
 
     if measured is None or measured_prob is None:
-        m, p = soft_measure(indices, n, vec, measured=measured)
+        m, p = soft_measure(indices, n, vec, measured=measured, input_offset=input_offset)
     else:
         m, p = measured, measured_prob
     mult_p = np.sqrt(1.0 / p)
@@ -345,7 +347,13 @@ def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out,
     with nogil:
         for i in range(n_indices):
             row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
-        for i in range(n_out):
+
+        for i in range(output_offset, n_out + output_offset):
             vec_row = entwine_bit(n_indices, n_non_indices, m, i, row_mask)
-            out[i] = vec[vec_row] * mult_p
+
+            # Skip out of range indices, put zero in that case.
+            if vec_row < input_offset or vec_row > n_indices + vec_row:
+                out[i - output_offset] = 0
+            else:
+                out[i - output_offset] = vec[vec_row - input_offset] * mult_p
     return m, p

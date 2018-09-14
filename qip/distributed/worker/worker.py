@@ -3,7 +3,7 @@ from qip.distributed.proto import *
 from qip.distributed.proto.conversion import *
 from qip.distributed.worker.worker_backends import SocketServerBackend, SocketWorkerBackend
 from qip.distributed.formatsock import FormatSocket
-from qip.backend import CythonBackend
+from qip.backend import CythonBackend, StateType
 import socket
 from threading import Thread, Lock
 from typing import Mapping, Tuple, Callable
@@ -29,7 +29,7 @@ class WorkerInstance:
         self.outputendindex = setup.output_index_end
         self.pool = workerpool
         self.logger = logger
-        indexgroups = list(pbindex_to_index(state.indices) for state in setup.states)
+        indexgroups = list(pbindices_to_indices(state.indices) for state in setup.states)
         feedstates = [get_state_value(state) for state in setup.states]
 
         # Contact other workers and create a backend.
@@ -39,9 +39,8 @@ class WorkerInstance:
                 if partner.state_index_start != partner.output_index_start:
                     continue
                 if partner.state_index_start == self.inputstartindex or partner.state_index_start == self.outputstartindex:
-                    self.pool.makeConnection(self.job_id, self.inputstartindex, self.inputendindex,
-                                             self.outputstartindex, self.outputendindex, partner)
-
+                    self.pool.make_connection(self.job_id, self.inputstartindex, self.inputendindex,
+                                              self.outputstartindex, self.outputendindex, partner)
 
         self.state = CythonBackend.make_state(self.n, indexgroups, feedstates,
                                               inputstartindex=self.inputstartindex, inputendindex=self.inputendindex,
@@ -52,10 +51,12 @@ class WorkerInstance:
         while True:
             self.logger("[*] Waiting for operation...")
             operation = self.serverapi.receive_operation()
+
             self.logger("[*] Performing operation:")
             self.logger(operation)
             if operation.HasField('close'):
                 break
+
             elif operation.HasField('kronprod'):
                 kronprod = operation.kronprod
                 mats = {}
@@ -63,8 +64,16 @@ class WorkerInstance:
                     indices, mat = pbmatop_to_matop(matop)
                     mats[indices] = mat
                 self.state.kronselect_dot(mats, input_offset=self.inputstartindex, output_offset=self.outputstartindex)
+
+            elif operation.HasField('total_prob'):
+                # Probability when measuring all bits (0xFFFFFFFF)
+                self.serverapi.report_probability(self.job_id, measured_bits=-1, measured_prob=self.state.total_prob())
+
             elif operation.HasField('measure'):
-                raise NotImplemented("Need to do measure sometime...")
+                indices = pbindices_to_indices(operation.measure.indices)
+                m, p = self.state.measure(indices, operation.measure.measure_result.measured_bits)
+                self.serverapi.report_probability(self.job_id, measured_bits=m, measured_prob=p)
+
             elif operation.HasField('sync'):
                 # This logic assumes all workers given equal share, if ever changed then this must be fixed.
                 if self.inputstartindex == self.outputstartindex and self.inputendindex == self.outputendindex:
@@ -72,25 +81,26 @@ class WorkerInstance:
                     self.state.swap()
 
                     # Receive output from everything which outputs to same region, add to current input
-                    self.pool.receiveStateIncrementsFromAll(self.job_id, self.state,
-                                                            self.outputstartindex, self.outputendindex)
+                    self.pool.receive_state_increments_from_all(self.job_id, self.state,
+                                                                self.outputstartindex, self.outputendindex)
 
                     # Send current input to everything which takes input from same region.
-                    self.pool.sendStateToAll(self.job_id, self.state, self.inputstartindex, self.inputendindex)
+                    self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex,
+                                                reduce_to=operation.reduce_workers_to)
 
                 else:
                     # Swap input and output
                     self.state.swap()
 
                     # Send current output to worker along diagonal with in/out equal to our output
-                    self.pool.sendStateToOne(self.job_id, self.state,
-                                             self.outputstartindex, self.outputendindex,
-                                             self.outputstartindex, self.outputendindex)
+                    self.pool.send_state_to_one(self.job_id, self.state,
+                                                self.outputstartindex, self.outputendindex,
+                                                self.outputstartindex, self.outputendindex)
 
                     # Receive new input from worker with in/out equal to our input. Set to current input.
-                    self.pool.receiveStateFromOne(self.job_id, self.state,
-                                                  self.inputstartindex, self.inputendindex,
-                                                  self.inputstartindex, self.inputendindex)
+                    self.pool.receive_state_from_one(self.job_id, self.state,
+                                                     self.inputstartindex, self.inputendindex,
+                                                     self.inputstartindex, self.inputendindex)
 
             else:
                 raise NotImplemented("Unknown operation: {}".format(operation))
@@ -99,7 +109,7 @@ class WorkerInstance:
             self.logger("\tReporting done...")
             self.serverapi.report_done(operation.job_id)
             self.logger("[+] Reported operation complete.")
-        self.pool.closeConnections(self.job_id)
+        self.pool.close_connections(self.job_id)
         del self.state
 
 
@@ -158,7 +168,8 @@ class WorkerPoolServer(Thread):
                 self.inputrange_workers[inputkey].append(sock)
                 self.outputrange_workers[outputkey].append(sock)
 
-    def sendStateToOne(self, job_id: str, state, inputstart: int, inputend: int, outputstart: int, outputend: int):
+    def send_state_to_one(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int,
+                          outputstart: int, outputend: int):
         sock = None
         sockkey = (job_id, inputstart, inputend, outputstart, outputend)
         with self.workerlock:
@@ -166,11 +177,12 @@ class WorkerPoolServer(Thread):
                 sock = self.workers[sockkey]
         if sock is not None:
             self.logger("[*] Sending state to {}".format(sockkey))
-            self.sendState(job_id, state, sock)
+            self.send_state(job_id, state, sock)
         else:
             self.logger("[*] Cannot send - No socket for {}".format(sockkey))
 
-    def sendStateToAll(self, job_id: str, state, start: int, end: int, inputdefined=True):
+    def send_state_to_all(self, job_id: str, state: CythonBackend, start: int, end: int,
+                          inputdefined=True, first_n: int = -1):
         socks = []
         rangekey = (job_id, start, end)
         if inputdefined:
@@ -182,10 +194,17 @@ class WorkerPoolServer(Thread):
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
         self.logger("[*] Sending state to {} workers...".format(len(socks)))
-        for sock in socks:
-            self.sendState(job_id, state, sock)
+        for i, sock in enumerate(socks):
+            # If first_n is defined above -1 then limit sends.
+            # TODO check this for measurement
+            if 0 <= first_n < i:
+                break
+            self.logger("\tSending to worker #{}".format(i))
+            self.send_state(job_id, state, sock)
 
-    def receiveStateFromOne(self, job_id: str, state, inputstart: int, inputend: int, outputstart: int, outputend: int):
+
+    def receive_state_from_one(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int,
+                               outputstart: int, outputend: int):
         sock = None
         rangekey = (job_id, inputstart, inputend, outputstart, outputend)
         with self.workerlock:
@@ -193,11 +212,12 @@ class WorkerPoolServer(Thread):
                 sock = self.workers[rangekey]
         if sock is not None:
             self.logger("[*] Receiving state from {}".format(rangekey))
-            self.receiveState(job_id, state, sock, overwrite=True)
+            self.receive_state(job_id, state, sock, overwrite=True)
         else:
             self.logger("[*] Cannot receive - No socket for {}".format(rangekey))
 
-    def receiveStateIncrementsFromAll(self, job_id: str, state, start: int, end: int, inputdefined=False):
+    def receive_state_increments_from_all(self, job_id: str, state: CythonBackend,
+                                          start: int, end: int, inputdefined=False):
         socks = []
         rangekey = (job_id, start, end)
         if inputdefined:
@@ -210,10 +230,10 @@ class WorkerPoolServer(Thread):
                     socks = self.outputrange_workers[rangekey]
         self.logger("[*] Receiving state from {} workers...".format(len(socks)))
         for sock in socks:
-            self.receiveState(job_id, state, sock, overwrite=False)
+            self.receive_state(job_id, state, sock, overwrite=False)
 
     # TODO rewrite as cython/c extension to improve speed.
-    def sendState(self, job_id: str, state, sock: socket):
+    def send_state(self, job_id: str, state: StateType, sock: socket):
         syncaccept = SyncAccept.FromString(sock.recv())
         if syncaccept.job_id != job_id:
             raise Exception("Job ids do not match: {}/{}".format(job_id, syncaccept.job_id))
@@ -245,7 +265,8 @@ class WorkerPoolServer(Thread):
                 raise Exception("Job ids do not match: {}/{}".format(job_id, syncaccept.job_id))
 
     # TODO rewrite as cython/c extension to improve speed.
-    def receiveState(self, job_id: str, state, sock: socket, overwrite=False, chunk_size=2048, max_inflight=4):
+    def receive_state(self, job_id: str, state: CythonBackend, sock: socket, overwrite: bool = False,
+                      chunk_size: int = 2048, max_inflight: int = 4):
         syncaccept = SyncAccept()
         syncaccept.job_id = job_id
         syncaccept.chunk_size = chunk_size
@@ -269,8 +290,8 @@ class WorkerPoolServer(Thread):
             sock.send(syncaccept.SerializeToString())
             running = not syncstate.done
 
-    def makeConnection(self, job_id: str, myinputstart: int, myinputend: int, myoutputstart: int, myoutputend: int,
-                       partner: WorkerPartner):
+    def make_connection(self, job_id: str, myinputstart: int, myinputend: int, myoutputstart: int, myoutputend: int,
+                        partner: WorkerPartner):
         self.logger("[*] Connecting to:\n{}".format(str(partner)))
         wp = WorkerPartner()
         wp.job_id = job_id
@@ -299,7 +320,7 @@ class WorkerPoolServer(Thread):
                 self.outputrange_workers[outputkey] = []
             self.outputrange_workers[outputkey].append(sock)
 
-    def closeConnections(self, job_id: Optional[str] = None):
+    def close_connections(self, job_id: Optional[str] = None):
         with self.workerlock:
             rangekeys = list(self.workers.keys())
             for rangekey in rangekeys:
@@ -318,7 +339,8 @@ class WorkerPoolServer(Thread):
 
 
 class WorkerRunner(Thread):
-    def __init__(self, addr: str = 'localhost', port: int = 1708, bindaddr: str = 'localhost', bindport: int = 0, logger: Callable[[str], None] = print):
+    def __init__(self, addr: str = 'localhost', port: int = 1708, bindaddr: str = 'localhost', bindport: int = 0,
+                 logger: Callable[[str], None] = print):
         super().__init__()
         sock = socket.socket()
         sock.connect((addr, port))

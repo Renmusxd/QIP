@@ -1,9 +1,12 @@
 from qip.distributed.proto import *
 from qip.distributed import formatsock
-from threading import Thread, Lock, Condition
+from collections import OrderedDict
+import itertools
+import random
 import socket
 import ssl
 from typing import Callable, Sequence, List
+from threading import Thread, Lock, Condition
 import uuid
 
 
@@ -153,6 +156,12 @@ class WorkerPool:
             worker.sock.send(workersetup.SerializeToString())
 
     def send_op(self, op: WorkerOperation):
+        if op.HasField('kronprod'):
+            self.send_kronprod(op)
+        elif op.HasField('measure'):
+            self.send_measure(op)
+
+    def send_kronprod(self, op: WorkerOperation):
         # Send to all
         for _, _, worker in self.workers:
             worker.sock.send(op.SerializeToString())
@@ -176,6 +185,75 @@ class WorkerPool:
             if conf.HasField('error_message'):
                 # TODO handle errors
                 raise Exception(conf.error_message)
+
+    def send_measure(self, op: WorkerOperation):
+        # First get all the worker probs
+        syncop = WorkerOperation()
+        syncop.total_prob = True
+        syncop.job_id = op.job_id  # Part of same job
+
+        # Get relevant rows which need to output reductions.
+        threshold = self.n >> len(op.measure.indices)
+        reduction_workers = OrderedDict()
+        for inputs, outputs, worker in self.workers:
+            if outputs[1] > threshold:
+                continue
+            if inputs not in reduction_workers:
+                reduction_workers[inputs] = []
+            reduction_workers[inputs].append(worker)
+        for workers in reduction_workers.values():
+            workers[0].sock.send(syncop.SerializeToString())
+
+        # Receive confirmations
+        r = random.random()
+        measured_inputs = (0, 0)
+        for ins in reduction_workers:
+            worker = reduction_workers[ins][0]
+            conf = WorkerConfirm.FromString(worker.sock.recv())
+            if conf.HasField('error_message'):
+                # TODO handle errors
+                raise Exception(conf.error_message)
+            r -= conf.measure_result.measured_prob
+            if r <= 0:
+                measured_inputs = ins
+
+        first_worker = reduction_workers[measured_inputs][0]
+        first_worker.sock.send(op.SerializeToString())
+        conf = WorkerConfirm.FromString(first_worker.sock.recv())
+
+        measured_prob = conf.measure_result.measured_prob
+        measured_bits = conf.measure_result.measured_bits
+
+
+
+        # Choose a random number, select a worker to make a measurement, get the bits.
+        # for i, (prob, ins) in enumerate(probs):
+        #     r -= prob
+        #     if r <= 0:
+        #         worker = reduction_workers[ins][0]
+        #         worker.sock.send(op.SerializeToString())
+        #         conf = WorkerConfirm.FromString(worker.sock.recv())
+        #         measured_index = i
+        #         measured_bits = conf.measure_result.measured_bits
+        #         measured_prob = conf.measure_result.measured_prob
+        #         measured_inputs = ins
+        #         break
+
+        # TODO
+
+
+        # Collect info about probability of measured bits from other workers
+        measureop = WorkerOperation()
+        measureop.measure.indices = op.measure.indices
+        measureop.measure.measure_result = measured_bits
+        for _, worker in itertools.chain(probs[:measured_index], probs[measured_index+1:]):
+            worker.sock.send(measureop.SerializeToString())
+        for _, worker in itertools.chain(probs[:measured_index], probs[measured_index+1:]):
+            conf = WorkerConfirm.FromString(worker.sock.recv())
+            measured_prob += conf.measure_result.measured_prob
+
+        # Now need to perform reduce step
+        # TODO
 
     def close(self, job_id: str) -> Sequence['AnnotatedSocket']:
         close_op = WorkerOperation()

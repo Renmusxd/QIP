@@ -4,14 +4,15 @@ from typing import Union, Sequence, Iterable, Tuple, Optional, Type, cast
 import numpy
 
 
-def indices_to_pbindices(indices: Iterable[int]) -> Indices:
-    pbindices = Indices()
+def indices_to_pbindices(indices: Iterable[int], pbindices: Optional[Indices] = None) -> Indices:
+    if pbindices is None:
+        pbindices = Indices()
     for index in indices:
         pbindices.index.append(index)
     return pbindices
 
 
-def pbindex_to_index(indices: Indices) -> Tuple[int, ...]:
+def pbindices_to_indices(indices: Indices) -> Tuple[int, ...]:
     return tuple(index for index in indices.index)
 
 
@@ -59,7 +60,7 @@ def matop_to_pbmatop(indices: Iterable[int], mat: Union[Sequence[Sequence[comple
 
 
 def pbmatop_to_matop(pbmatop: MatrixOp) -> Tuple[Tuple[int, ...], object]:
-    indices = pbindex_to_index(pbmatop.indices)
+    indices = pbindices_to_indices(pbmatop.indices)
     if pbmatop.HasField('swap'):
         return indices, SwapMat(int(len(indices)/2))
     elif pbmatop.HasField('matrix'):

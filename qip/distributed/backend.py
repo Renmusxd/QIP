@@ -29,7 +29,7 @@ class DistributedBackend(StateType):
         self.socket.send(host_info.SerializeToString())
 
     @staticmethod
-    def make_state(n: int ,index_groups: Sequence[Sequence[int]], feed_list: Sequence[InitialState],
+    def make_state(n: int, index_groups: Sequence[Sequence[int]], feed_list: Sequence[InitialState],
                    state: InitialState = None, startindex: Optional[int] = None, endindex: Optional[int] = None,
                    statetype: type = numpy.complex128) -> StateType:
         if startindex is not None or endindex is not None:
@@ -62,15 +62,15 @@ class DistributedBackend(StateType):
 
     def kronselect_dot(self, mats: Mapping[IndexType, MatrixType],
                        input_offset: int = 0, output_offset: int = 0) -> None:
-        kronprodop = KronProd()
+        workerop = WorkerOperation()
         for indices in mats:
             mat = mats[indices]
-            matop_to_pbmatop(indices, mat, kronprodop.matrices.add())
-        workerop = WorkerOperation()
+            matop_to_pbmatop(indices, mat, workerop.kronprod.matrices.add())
         workerop.job_id = self.state
-        workerop.kronprod.CopyFrom(kronprodop)
+
         self.socket.send(workerop.SerializeToString())
         conf = WorkerConfirm.FromString(self.socket.recv())
+
         if conf.HasField('error_message'):
             self.close()
             raise Exception(conf.error_message)
@@ -83,8 +83,18 @@ class DistributedBackend(StateType):
         raise NotImplemented()
 
     def measure(self, indices: IndexType, measured: Optional[int] = None,
-                measured_prob: Optional[float] = None) -> Tuple[StateType, int]:
-        raise NotImplemented()
+                measured_prob: Optional[float] = None,
+                input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+        workerop = WorkerOperation()
+        indices_to_pbindices(indices, workerop.measure.indices)
+
+        self.socket.send(workerop.SerializeToString())
+        conf = WorkerConfirm.FromString(self.socket.recv())
+
+        if conf.HasField('error_message'):
+            raise Exception(conf.error_message)
+        else:
+            return conf.measure_result.measured_bits, conf.measure_result.measured_prob
 
     def measure_probabilities(self, indices: IndexType) -> Sequence[float]:
         raise NotImplemented()

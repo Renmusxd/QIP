@@ -1,10 +1,11 @@
 from qip.ext.kronprod import cdot_loop
 from qip.ext.kronprod import measure
 from qip.ext.kronprod import measure_probabilities
+from qip.ext.kronprod import prob_magnitude
 from qip.ext.func_apply import func_apply
 from qip.util import kronselect_dot, gen_edit_indices, InitialState, IndexType, MatrixType
 import numpy
-from typing import Sequence, Mapping, Callable, Optional
+from typing import Sequence, Mapping, Callable, Optional, Tuple
 
 
 class StateType:
@@ -23,8 +24,12 @@ class StateType:
                    input_offset: int = 0, output_offset: int = 0) -> None:
         raise NotImplemented("func_apply not implemented by base class")
 
+    def total_prob(self) -> float:
+        raise NotImplemented("total_prob not implemented by base class")
+
     def measure(self, indices: Sequence[int], measured: Optional[int] = None,
-                measured_prob: Optional[float] = None) -> int:
+                measured_prob: Optional[float] = None,
+                input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
         raise NotImplemented("measure not implemented by base class")
 
     def measure_probabilities(self, indices: Sequence[int]) -> Sequence[float]:
@@ -99,28 +104,21 @@ class CythonBackend(StateType):
         func_apply(reg1_indices, reg2_indices, func, self.state, self.n, self.arena)
         self.state, self.arena = self.arena, self.state
 
+    def total_prob(self) -> float:
+        return prob_magnitude(self.state)
+
     def measure(self, indices: Sequence[int], measured: Optional[int] = None,
-                measured_prob: Optional[float] = None) -> int:
-        inputvals = self.state
-        arena = self.arena
+                measured_prob: Optional[float] = None,
+                input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+        # Get an appropriately sized arena
+        numpy.resize(self.arena, (self.arena >> len(indices),))
+        bits, prob = measure(indices, self.n, self.state, self.arena,
+                             measured=measured, measured_prob=measured_prob,
+                             input_offset=input_offset, output_offset=output_offset)
+        numpy.resize(self.state, self.arena.shape)
+        self.state, self.arena = self.arena, self.state
 
-        bits = measure(indices, self.n, inputvals, arena, measured=measured, measured_prob=measured_prob)
-
-        # Cut and kill old memory after measurement so that footprint never grows above original.
-        tmp_size = inputvals.shape[0]
-        tmp_dtype = inputvals.dtype
-        del inputvals
-
-        new_inputvals = numpy.ndarray(shape=(tmp_size >> self.n), dtype=tmp_dtype)
-
-        # Copy out relevant area from old arena
-        new_arena = arena[:arena.shape[0] >> self.n]
-        del arena
-
-        self.state = new_arena
-        self.arena = new_inputvals
-
-        return bits
+        return bits, prob
 
     def measure_probabilities(self, indices: Sequence[int]) -> Sequence[float]:
         return measure_probabilities(indices, self.n, self.state)
