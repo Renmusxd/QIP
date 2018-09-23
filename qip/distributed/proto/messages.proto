@@ -114,10 +114,12 @@ message MeasureResult {
 message Measure {
     optional Indices indices = 1;
     optional MeasureResult measure_result = 2;
+    optional bool soft = 3;
 }
 
 message Sync {
-    optional int32 reduce_workers_to = 1 [default = -1];
+    // Index up to which to set states.
+    optional int64 set_up_to = 1;
 }
 
 message WorkerOperation {

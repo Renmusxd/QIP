@@ -1,5 +1,6 @@
 from qip.ext.kronprod import cdot_loop
 from qip.ext.kronprod import measure
+from qip.ext.kronprod import soft_measure
 from qip.ext.kronprod import measure_probabilities
 from qip.ext.kronprod import prob_magnitude
 from qip.ext.func_apply import func_apply
@@ -30,6 +31,10 @@ class StateType:
     def measure(self, indices: Sequence[int], measured: Optional[int] = None,
                 measured_prob: Optional[float] = None,
                 input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+        raise NotImplemented("measure not implemented by base class")
+
+    def soft_measure(self, indices: Sequence[int], measured: Optional[int] = None,
+                     input_offset: int = 0) -> Tuple[int, float]:
         raise NotImplemented("measure not implemented by base class")
 
     def measure_probabilities(self, indices: Sequence[int]) -> Sequence[float]:
@@ -119,6 +124,10 @@ class CythonBackend(StateType):
         self.state, self.arena = self.arena, self.state
 
         return bits, prob
+
+    def soft_measure(self, indices: Sequence[int], measured: Optional[int] = None,
+                     input_offset: int = 0) -> Tuple[int, float]:
+        return soft_measure(indices, self.state, measured=measured, input_offset=input_offset)
 
     def measure_probabilities(self, indices: Sequence[int]) -> Sequence[float]:
         return measure_probabilities(indices, self.n, self.state)

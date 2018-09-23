@@ -5,7 +5,7 @@ import itertools
 import random
 import socket
 import ssl
-from typing import Callable, Sequence, List
+from typing import Callable, Sequence, List, Tuple, Iterable
 from threading import Thread, Lock, Condition
 import uuid
 
@@ -54,7 +54,11 @@ class Manager:
                 else:
                     with self.pool_lock:
                         pool = self.job_pools[state_handle.state_handle]
-                    pool.send_op(op)
+                    returned_workers = pool.send_op(op)
+                    if returned_workers:
+                        self.logger("[*] Returning {} workers to pool.".format(len(returned_workers)))
+                        with self.worker_lock:
+                            self.free_workers.extend(returned_workers)
 
                 self.logger("[*] Sending confirmation to client...")
                 conf = WorkerConfirm()
@@ -106,11 +110,12 @@ class InsufficientResources(ValueError):
 
 
 class WorkerPool:
-    def __init__(self, n: int, worker_n: int):
+    def __init__(self, n: int, worker_n: int, logger: Callable[[str], None] = print):
         self.n = n
         self.worker_n = worker_n
         self.unallocated_workers = []
         self.workers = []
+        self.logger = logger
 
     def draw_workers(self, workers: Sequence['AnnotatedSocket']) -> Sequence['AnnotatedSocket']:
         # Assume all equal.
@@ -158,8 +163,12 @@ class WorkerPool:
     def send_op(self, op: WorkerOperation):
         if op.HasField('kronprod'):
             self.send_kronprod(op)
+            return []
         elif op.HasField('measure'):
-            self.send_measure(op)
+            if op.measure.soft:
+                raise NotImplemented("Need to implement soft measurement")
+            else:
+                return self.send_reduce_measure(op)
 
     def send_kronprod(self, op: WorkerOperation):
         # Send to all
@@ -186,14 +195,7 @@ class WorkerPool:
                 # TODO handle errors
                 raise Exception(conf.error_message)
 
-    def send_measure(self, op: WorkerOperation):
-        # First get all the worker probs
-        syncop = WorkerOperation()
-        syncop.total_prob = True
-        syncop.job_id = op.job_id  # Part of same job
-
-        # Get relevant rows which need to output reductions.
-        threshold = self.n >> len(op.measure.indices)
+    def get_workers_up_to_output(self, threshold: int) -> OrderedDict[Tuple[int, int], List['AnnotatedSocket']]:
         reduction_workers = OrderedDict()
         for inputs, outputs, worker in self.workers:
             if outputs[1] > threshold:
@@ -201,59 +203,97 @@ class WorkerPool:
             if inputs not in reduction_workers:
                 reduction_workers[inputs] = []
             reduction_workers[inputs].append(worker)
-        for workers in reduction_workers.values():
-            workers[0].sock.send(syncop.SerializeToString())
+        return reduction_workers
 
-        # Receive confirmations
+    def send_reduce_measure(self, op: WorkerOperation):
+        # Get relevant rows which need to output reductions.
+        threshold = self.n >> len(op.measure.indices)
+        reduction_workers = self.get_workers_up_to_output(threshold)
+
+        # First get all the worker probs
+        probop = WorkerOperation()
+        probop.total_prob = True
+        probop.job_id = op.job_id  # Part of same job
+        inputs = list(sorted(reduction_workers.keys()))
+        first_workers = [reduction_workers[input_tuple][0] for input_tuple in inputs]
+        confs = self.map_workers_via_op(probop, first_workers, throw_errors=True)
+
+        # Find the measured input values.
         r = random.random()
-        measured_inputs = (0, 0)
-        for ins in reduction_workers:
-            worker = reduction_workers[ins][0]
-            conf = WorkerConfirm.FromString(worker.sock.recv())
-            if conf.HasField('error_message'):
-                # TODO handle errors
-                raise Exception(conf.error_message)
+        measured_inputs = None
+        for ins, conf in zip(inputs, confs):
             r -= conf.measure_result.measured_prob
             if r <= 0:
                 measured_inputs = ins
+                break
 
+        # Ask appropriate worker to get a measurement.
         first_worker = reduction_workers[measured_inputs][0]
-        first_worker.sock.send(op.SerializeToString())
+        get_bits = op.copy()
+        get_bits.measure.soft = True
+        first_worker.sock.send(get_bits.SerializeToString())
         conf = WorkerConfirm.FromString(first_worker.sock.recv())
-
-        measured_prob = conf.measure_result.measured_prob
         measured_bits = conf.measure_result.measured_bits
+        # Measured_prob is at least what was measured for the first worker.
+        measured_prob = conf.measure_result.measured_prob
 
+        # Accumulate probability from each worker.
+        get_bits.measure.measure_result.measured_bits = measured_bits
+        measure_prob_workers = [reduction_workers[ins][0] for ins in inputs
+                                if ins != measured_inputs]
+        confs = self.map_workers_via_op(get_bits, measure_prob_workers, throw_errors=True)
+        measured_prob += sum(conf.measure_result.measured_prob for conf in confs)
 
+        # Flatten worker dictionary.
+        all_reduction_workers = [worker for workers in reduction_workers.values() for worker in workers]
 
-        # Choose a random number, select a worker to make a measurement, get the bits.
-        # for i, (prob, ins) in enumerate(probs):
-        #     r -= prob
-        #     if r <= 0:
-        #         worker = reduction_workers[ins][0]
-        #         worker.sock.send(op.SerializeToString())
-        #         conf = WorkerConfirm.FromString(worker.sock.recv())
-        #         measured_index = i
-        #         measured_bits = conf.measure_result.measured_bits
-        #         measured_prob = conf.measure_result.measured_prob
-        #         measured_inputs = ins
-        #         break
+        # We not have the total probability for the measured_bits, we can reduce.
+        reduce_op = op.copy()
+        reduce_op.measure.measured_result.measured_bits = measured_bits
+        reduce_op.measure.soft = False
+        reduce_op.measure.measured_result.measured_prob = measured_prob
+        self.map_workers_via_op(reduce_op, all_reduction_workers, throw_errors=True)
 
-        # TODO
+        # Now sync to smaller worker set and remove unnecessary workers.
+        syncop = WorkerOperation()
+        syncop.job_id = op.job_id
+        syncop.sync.set_up_to = threshold
+        self.map_workers_via_op(syncop, all_reduction_workers, throw_errors=True)
 
+        # Now find which workers need to be returned to the pool.
+        remaining_workers = []
+        done_workers = []
+        close_op = WorkerOperation()
+        close_op.job_id = op.job_id
+        close_op.close = True
+        for inputs, outputs, worker in self.workers:
+            if inputs[1] <= threshold and outputs[1] <= threshold:
+                remaining_workers.append((inputs, outputs, worker))
+            else:
+                worker.sock.send(close_op.SerializeToString())
+                done_workers.append(worker)
 
-        # Collect info about probability of measured bits from other workers
-        measureop = WorkerOperation()
-        measureop.measure.indices = op.measure.indices
-        measureop.measure.measure_result = measured_bits
-        for _, worker in itertools.chain(probs[:measured_index], probs[measured_index+1:]):
-            worker.sock.send(measureop.SerializeToString())
-        for _, worker in itertools.chain(probs[:measured_index], probs[measured_index+1:]):
+        self.workers = remaining_workers
+        return done_workers
+
+    def send_to_each_of(self, op: WorkerOperation, workers: Iterable['AnnotatedSocket']):
+        for worker in workers:
+            worker.sock.send(op.SerializeToString)
+
+    def receive_from_each_of(self, workers: Iterable['AnnotatedSocket'],
+                             throw_errors: bool = True) -> List[WorkerConfirm]:
+        confs = []
+        for worker in workers:
             conf = WorkerConfirm.FromString(worker.sock.recv())
-            measured_prob += conf.measure_result.measured_prob
+            confs.append(conf)
+            if throw_errors and conf.HasField('error_message'):
+                raise Exception(conf.error_message)
+        return confs
 
-        # Now need to perform reduce step
-        # TODO
+    def map_workers_via_op(self, op: WorkerOperation, workers: Sequence['AnnotatedSocket'],
+                           throw_errors: bool = True) -> Sequence['WorkerConfirm']:
+        self.send_to_each_of(op, workers)
+        return self.receive_from_each_of(workers, throw_errors=throw_errors)
 
     def close(self, job_id: str) -> Sequence['AnnotatedSocket']:
         close_op = WorkerOperation()

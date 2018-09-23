@@ -67,11 +67,19 @@ class WorkerInstance:
 
             elif operation.HasField('total_prob'):
                 # Probability when measuring all bits (0xFFFFFFFF)
-                self.serverapi.report_probability(self.job_id, measured_bits=-1, measured_prob=self.state.total_prob())
+                self.serverapi.report_probability(self.job_id, measured_prob=self.state.total_prob())
 
             elif operation.HasField('measure'):
                 indices = pbindices_to_indices(operation.measure.indices)
-                m, p = self.state.measure(indices, operation.measure.measure_result.measured_bits)
+                if operation.measure.soft:
+                    measured = None
+                    if operation.measure.HasField('measure_result'):
+                        measured = operation.measure.measure_result.measured_bits
+                    m, p = self.state.soft_measure(indices, measured=measured,
+                                                   input_offset=self.inputstartindex)
+                else:
+                    m, p = self.state.measure(indices, operation.measure.measure_result.measured_bits,
+                                              input_offset=self.inputstartindex)
                 self.serverapi.report_probability(self.job_id, measured_bits=m, measured_prob=p)
 
             elif operation.HasField('sync'):
@@ -85,8 +93,11 @@ class WorkerInstance:
                                                                 self.outputstartindex, self.outputendindex)
 
                     # Send current input to everything which takes input from same region.
-                    self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex,
-                                                reduce_to=operation.reduce_workers_to)
+                    if operation.set_up_to:
+                        self.pool.send_state_up_to(self.job_id, self.state, self.inputstartindex, self.inputendindex,
+                                                   operation.set_up_to)
+                    else:
+                        self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex)
 
                 else:
                     # Swap input and output
@@ -165,16 +176,16 @@ class WorkerPoolServer(Thread):
                     self.outputrange_workers[outputkey] = []
 
                 self.workers[fullkey] = sock
-                self.inputrange_workers[inputkey].append(sock)
-                self.outputrange_workers[outputkey].append(sock)
+                self.inputrange_workers[inputkey].append((sock, workersetup.output_index_start, workersetup.output_index_end))
+                self.outputrange_workers[outputkey].append((sock, workersetup.state_index_start, workersetup.state_index_end))
 
     def send_state_to_one(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int,
-                          outputstart: int, outputend: int):
-        sock = None
+                          outputstart: int, outputend: int, sock: Optional[FormatSocket] = None):
         sockkey = (job_id, inputstart, inputend, outputstart, outputend)
-        with self.workerlock:
-            if sockkey in self.workers:
-                sock = self.workers[sockkey]
+        if sock is None:
+            with self.workerlock:
+                if sockkey in self.workers:
+                    sock = self.workers[sockkey]
         if sock is not None:
             self.logger("[*] Sending state to {}".format(sockkey))
             self.send_state(job_id, state, sock)
@@ -182,7 +193,7 @@ class WorkerPoolServer(Thread):
             self.logger("[*] Cannot send - No socket for {}".format(sockkey))
 
     def send_state_to_all(self, job_id: str, state: CythonBackend, start: int, end: int,
-                          inputdefined=True, first_n: int = -1):
+                          inputdefined=True):
         socks = []
         rangekey = (job_id, start, end)
         if inputdefined:
@@ -194,14 +205,17 @@ class WorkerPoolServer(Thread):
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
         self.logger("[*] Sending state to {} workers...".format(len(socks)))
-        for i, sock in enumerate(socks):
-            # If first_n is defined above -1 then limit sends.
-            # TODO check this for measurement
-            if 0 <= first_n < i:
-                break
+        for i, (sock, _, _) in enumerate(socks):
             self.logger("\tSending to worker #{}".format(i))
             self.send_state(job_id, state, sock)
 
+    def send_state_up_to(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int, threshold: int = 0):
+        rangekey = (job_id, inputstart, inputend)
+        with self.workerlock:
+            for sock, outputstart, outputend in self.inputrange_workers[rangekey]:
+                if outputend > threshold:
+                    continue
+                self.send_state(job_id, state, sock)
 
     def receive_state_from_one(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int,
                                outputstart: int, outputend: int):

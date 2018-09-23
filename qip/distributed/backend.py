@@ -96,6 +96,10 @@ class DistributedBackend(StateType):
         else:
             return conf.measure_result.measured_bits, conf.measure_result.measured_prob
 
+    def soft_measure(self, indices: Sequence[int], measured: Optional[int] = None,
+                     input_offset: int = 0):
+        raise NotImplemented()
+
     def measure_probabilities(self, indices: IndexType) -> Sequence[float]:
         raise NotImplemented()
 

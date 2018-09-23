@@ -59,8 +59,10 @@ class SocketServerBackend(ServerBackend):
                            measured_bits: Optional[int] = None):
         conf = WorkerConfirm()
         conf.job_id = job_id
-        conf.measure_result.measured_bits = measured_bits
-        conf.measure_result.measured_prob = measured_prob
+        if measured_bits is not None:
+            conf.measure_result.measured_bits = measured_bits
+        if measured_prob is not None:
+            conf.measure_result.measured_prob = measured_prob
         self.serversocket.send(conf.SerializeToString())
 
 
