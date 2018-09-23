@@ -104,5 +104,8 @@ class DistributedBackend(StateType):
         raise NotImplemented()
 
     def close(self):
+        close_op = WorkerOperation()
+        close_op.close = True
+        self.socket.send(close_op.SerializeToString())
         self.socket.close()
 

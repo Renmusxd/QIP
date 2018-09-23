@@ -67,7 +67,10 @@ class WorkerInstance:
 
             elif operation.HasField('total_prob'):
                 # Probability when measuring all bits (0xFFFFFFFF)
-                self.serverapi.report_probability(self.job_id, measured_prob=self.state.total_prob())
+                p = self.state.total_prob()
+                self.serverapi.report_probability(operation.job_id, measured_prob=p)
+                self.logger("[*] Reporting p={}".format(p))
+                continue
 
             elif operation.HasField('measure'):
                 indices = pbindices_to_indices(operation.measure.indices)
@@ -75,47 +78,69 @@ class WorkerInstance:
                     measured = None
                     if operation.measure.HasField('measure_result'):
                         measured = operation.measure.measure_result.measured_bits
-                    m, p = self.state.soft_measure(indices, measured=measured,
-                                                   input_offset=self.inputstartindex)
+                    m, p = self.state.soft_measure(indices, measured=measured, input_offset=self.inputstartindex)
                 else:
-                    m, p = self.state.measure(indices, operation.measure.measure_result.measured_bits,
+                    measured = None
+                    measured_prob = None
+                    if operation.measure.HasField('measure_result'):
+                        measured = operation.measure.measure_result.measured_bits
+                        measured_prob = operation.measure.measure_result.measured_prob
+                    m, p = self.state.measure(indices, measured=measured, measured_prob=measured_prob,
                                               input_offset=self.inputstartindex)
-                self.serverapi.report_probability(self.job_id, measured_bits=m, measured_prob=p)
+                self.logger("[*] Reporting m={}\tp={}".format(m,p))
+                self.serverapi.report_probability(operation.job_id, measured_bits=m, measured_prob=p)
+                continue
 
             elif operation.HasField('sync'):
                 # This logic assumes all workers given equal share, if ever changed then this must be fixed.
                 if self.inputstartindex == self.outputstartindex and self.inputendindex == self.outputendindex:
+                    self.logger("Sync ====")
                     # Output becomes input
+                    self.logger("Sync swap")
                     self.state.swap()
 
                     # Receive output from everything which outputs to same region, add to current input
+                    self.logger("Sync receive_state_increments_from_all")
                     self.pool.receive_state_increments_from_all(self.job_id, self.state,
                                                                 self.outputstartindex, self.outputendindex)
 
                     # Send current input to everything which takes input from same region.
-                    if operation.set_up_to:
+                    if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:
+                        self.logger("Sync send_state_up_to")
                         self.pool.send_state_up_to(self.job_id, self.state, self.inputstartindex, self.inputendindex,
-                                                   operation.set_up_to)
+                                                   operation.sync.set_up_to)
                     else:
+                        self.logger("Sync send_state_to_all")
                         self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex)
 
                 else:
+                    self.logger("Sync else")
                     # Swap input and output
+                    self.logger("Sync swap")
                     self.state.swap()
 
                     # Send current output to worker along diagonal with in/out equal to our output
+                    self.logger("Sync send_state_to_one")
                     self.pool.send_state_to_one(self.job_id, self.state,
                                                 self.outputstartindex, self.outputendindex,
                                                 self.outputstartindex, self.outputendindex)
 
-                    # Receive new input from worker with in/out equal to our input. Set to current input.
-                    self.pool.receive_state_from_one(self.job_id, self.state,
-                                                     self.inputstartindex, self.inputendindex,
-                                                     self.inputstartindex, self.inputendindex)
+                    should_receive = True
+                    if operation.sync.HasField('set_up_to'):
+                        if operation.sync.set_up_to <= self.inputendindex or operation.sync.set_up_to <= self.outputendindex:
+                            should_receive = False
+
+                    if should_receive:
+                        # Receive new input from worker with in/out equal to our input. Set to current input.
+                        self.logger("Sync receive_state_from_one")
+                        self.pool.receive_state_from_one(self.job_id, self.state,
+                                                         self.inputstartindex, self.inputendindex,
+                                                         self.inputstartindex, self.inputendindex)
 
             else:
                 raise NotImplemented("Unknown operation: {}".format(operation))
 
+            # If didn't override report system (see measurement), report done.
             self.logger("[+] Operation done!")
             self.logger("\tReporting done...")
             self.serverapi.report_done(operation.job_id)
@@ -211,10 +236,13 @@ class WorkerPoolServer(Thread):
 
     def send_state_up_to(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int, threshold: int = 0):
         rangekey = (job_id, inputstart, inputend)
+        self.logger("send_state_up_to before lock")
         with self.workerlock:
+            self.logger("send_state_up_to after lock")
             for sock, outputstart, outputend in self.inputrange_workers[rangekey]:
-                if outputend > threshold:
+                if outputstart >= threshold:
                     continue
+                self.logger("Sending to outputs: {}:{}".format(outputstart, outputend))
                 self.send_state(job_id, state, sock)
 
     def receive_state_from_one(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int,
@@ -243,7 +271,7 @@ class WorkerPoolServer(Thread):
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
         self.logger("[*] Receiving state from {} workers...".format(len(socks)))
-        for sock in socks:
+        for sock, _, _ in socks:
             self.receive_state(job_id, state, sock, overwrite=False)
 
     # TODO rewrite as cython/c extension to improve speed.
@@ -328,11 +356,11 @@ class WorkerPoolServer(Thread):
 
             if inputkey not in self.inputrange_workers:
                 self.inputrange_workers[inputkey] = []
-            self.inputrange_workers[inputkey].append(sock)
+            self.inputrange_workers[inputkey].append((sock, partner.output_index_start, partner.output_index_end))
 
             if outputkey not in self.outputrange_workers:
                 self.outputrange_workers[outputkey] = []
-            self.outputrange_workers[outputkey].append(sock)
+            self.outputrange_workers[outputkey].append((sock, partner.state_index_start, partner.state_index_end))
 
     def close_connections(self, job_id: Optional[str] = None):
         with self.workerlock:
@@ -383,8 +411,8 @@ class WorkerRunner(Thread):
         while True:
             self.logger("[*] Waiting for setup...")
             setup = WorkerSetup.FromString(self.socket.recv())
-            self.logger(setup)
-            worker = WorkerInstance(self.serverapi, self.pool, setup)
+            self.logger("[+] Setup: {}".format(setup))
+            worker = WorkerInstance(self.serverapi, self.pool, setup, logger=self.logger)
             worker.run()
 
 

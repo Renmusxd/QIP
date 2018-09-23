@@ -18,8 +18,8 @@ class ServerBackend:
         """Tell the server that the task job_id is done"""
         raise NotImplemented("Not implemented")
 
-    def report_probability(self, job_id: str, measured_prob: Optional[float] = None,
-                           measured_bits: Optional[int] = None):
+    def report_probability(self, job_id: str, measured_bits: Optional[int] = None,
+                           measured_prob: Optional[float] = None):
         raise NotImplemented("Not implemented")
 
 
@@ -55,8 +55,8 @@ class SocketServerBackend(ServerBackend):
         conf.job_id = job_id
         self.serversocket.send(conf.SerializeToString())
 
-    def report_probability(self, job_id: str, measured_prob: Optional[float] = None,
-                           measured_bits: Optional[int] = None):
+    def report_probability(self, job_id: str, measured_bits: Optional[int] = None,
+                           measured_prob: Optional[float] = None):
         conf = WorkerConfirm()
         conf.job_id = job_id
         if measured_bits is not None:

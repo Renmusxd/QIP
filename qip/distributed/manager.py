@@ -1,11 +1,12 @@
 from qip.distributed.proto import *
+from qip.distributed.proto.conversion import *
 from qip.distributed import formatsock
 from collections import OrderedDict
 import itertools
 import random
 import socket
 import ssl
-from typing import Callable, Sequence, List, Tuple, Iterable
+from typing import Callable, Sequence, List, Tuple, Iterable, Mapping
 from threading import Thread, Lock, Condition
 import uuid
 
@@ -56,7 +57,7 @@ class Manager:
                         pool = self.job_pools[state_handle.state_handle]
                     returned_workers = pool.send_op(op)
                     if returned_workers:
-                        self.logger("[*] Returning {} workers to pool.".format(len(returned_workers)))
+                        self.logger("[*] Returning {} workers to pool after operation.".format(len(returned_workers)))
                         with self.worker_lock:
                             self.free_workers.extend(returned_workers)
 
@@ -81,11 +82,12 @@ class Manager:
             with self.worker_lock:
                 self.free_workers.extend(returned_workers)
             sock.close()
+            self.logger("[*] Socket closed.")
 
     def make_state(self, setup: StateSetup) -> StateHandle:
         n = setup.n
         with self.worker_lock:
-            pool = WorkerPool(n, Manager.WORKER_N)
+            pool = WorkerPool(n, Manager.WORKER_N, logger=self.logger)
             self.free_workers = pool.draw_workers(self.free_workers)
         state_handle = StateHandle()
         try:
@@ -99,14 +101,10 @@ class Manager:
             state_handle.error_message = str(e)
             return state_handle
 
-    def serve_worker(self, sock: socket, info: HostInformation):
-        # TODO
-        pass
-
 
 class InsufficientResources(ValueError):
     def __init__(self, msg):
-        super(InsufficientResources).__init__(self, msg)
+        super(InsufficientResources, self).__init__(msg)
 
 
 class WorkerPool:
@@ -122,7 +120,7 @@ class WorkerPool:
         # Required along one side of matrix is 2**n/2**m == 2**(n-m), so total is that squared == 2**2(n-m) (at least 1)
         required_workers = pow(2, 2 * max(self.n - self.worker_n, 0))
         if len(workers) < required_workers:
-            raise InsufficientResources("Not enough workers")
+            raise InsufficientResources("Not enough workers: Has {} but needs {}".format(len(workers), required_workers))
         self.unallocated_workers, remaining_workers = list(workers[:required_workers]), workers[required_workers:]
 
         return remaining_workers
@@ -134,7 +132,6 @@ class WorkerPool:
         # list of (x, x + 2**workern)
         workerranges = list(zip(workerseps[:-1], workerseps[1:]))
 
-        print("Making ranges: {}".format(workerseps))
         for inputrange in workerranges:
             for outputrange in workerranges:
                 self.workers.append((inputrange, outputrange, self.unallocated_workers.pop()))
@@ -183,7 +180,7 @@ class WorkerPool:
 
         # Tell all to sync.
         syncop = WorkerOperation()
-        syncop.sync = True
+        syncop.sync.set_up_to = 0
         syncop.job_id = op.job_id  # Part of same job
         for _, _, worker in self.workers:
             worker.sock.send(syncop.SerializeToString())
@@ -195,7 +192,7 @@ class WorkerPool:
                 # TODO handle errors
                 raise Exception(conf.error_message)
 
-    def get_workers_up_to_output(self, threshold: int) -> OrderedDict[Tuple[int, int], List['AnnotatedSocket']]:
+    def get_workers_up_to_output(self, threshold: int) -> Mapping[Tuple[int, int], List['AnnotatedSocket']]:
         reduction_workers = OrderedDict()
         for inputs, outputs, worker in self.workers:
             if outputs[1] > threshold:
@@ -207,7 +204,9 @@ class WorkerPool:
 
     def send_reduce_measure(self, op: WorkerOperation):
         # Get relevant rows which need to output reductions.
-        threshold = self.n >> len(op.measure.indices)
+        indices = pbindices_to_indices(op.measure.indices)
+        threshold = 2**(self.n - len(indices))
+        self.logger("[*] Measurement threshold is {}".format(threshold))
         reduction_workers = self.get_workers_up_to_output(threshold)
 
         # First get all the worker probs
@@ -229,11 +228,13 @@ class WorkerPool:
 
         # Ask appropriate worker to get a measurement.
         first_worker = reduction_workers[measured_inputs][0]
-        get_bits = op.copy()
+        get_bits = WorkerOperation()
+        get_bits.CopyFrom(op)
         get_bits.measure.soft = True
         first_worker.sock.send(get_bits.SerializeToString())
         conf = WorkerConfirm.FromString(first_worker.sock.recv())
         measured_bits = conf.measure_result.measured_bits
+        self.logger("[*] Measured bits are {}".format(measured_bits))
         # Measured_prob is at least what was measured for the first worker.
         measured_prob = conf.measure_result.measured_prob
 
@@ -243,21 +244,25 @@ class WorkerPool:
                                 if ins != measured_inputs]
         confs = self.map_workers_via_op(get_bits, measure_prob_workers, throw_errors=True)
         measured_prob += sum(conf.measure_result.measured_prob for conf in confs)
+        self.logger("[*] Measured prob is {}".format(measured_prob))
 
         # Flatten worker dictionary.
         all_reduction_workers = [worker for workers in reduction_workers.values() for worker in workers]
 
         # We not have the total probability for the measured_bits, we can reduce.
-        reduce_op = op.copy()
-        reduce_op.measure.measured_result.measured_bits = measured_bits
+        reduce_op = WorkerOperation()
+        reduce_op.CopyFrom(op)
+        reduce_op.measure.measure_result.measured_bits = measured_bits
+        reduce_op.measure.measure_result.measured_prob = measured_prob
         reduce_op.measure.soft = False
-        reduce_op.measure.measured_result.measured_prob = measured_prob
+        self.logger("[*] Performing reduction measurement")
         self.map_workers_via_op(reduce_op, all_reduction_workers, throw_errors=True)
 
         # Now sync to smaller worker set and remove unnecessary workers.
         syncop = WorkerOperation()
         syncop.job_id = op.job_id
         syncop.sync.set_up_to = threshold
+        self.logger("[*] Performing synchronization")
         self.map_workers_via_op(syncop, all_reduction_workers, throw_errors=True)
 
         # Now find which workers need to be returned to the pool.
@@ -266,19 +271,21 @@ class WorkerPool:
         close_op = WorkerOperation()
         close_op.job_id = op.job_id
         close_op.close = True
+        self.logger("[*] Closing obsolete workers...")
         for inputs, outputs, worker in self.workers:
             if inputs[1] <= threshold and outputs[1] <= threshold:
                 remaining_workers.append((inputs, outputs, worker))
             else:
                 worker.sock.send(close_op.SerializeToString())
                 done_workers.append(worker)
+        self.logger("\tClosed {} workers".format(len(done_workers)))
 
         self.workers = remaining_workers
         return done_workers
 
     def send_to_each_of(self, op: WorkerOperation, workers: Iterable['AnnotatedSocket']):
         for worker in workers:
-            worker.sock.send(op.SerializeToString)
+            worker.sock.send(op.SerializeToString())
 
     def receive_from_each_of(self, workers: Iterable['AnnotatedSocket'],
                              throw_errors: bool = True) -> List[WorkerConfirm]:
@@ -296,6 +303,7 @@ class WorkerPool:
         return self.receive_from_each_of(workers, throw_errors=throw_errors)
 
     def close(self, job_id: str) -> Sequence['AnnotatedSocket']:
+        self.logger("[*] Closing pool with {} workers".format(len(self.workers)))
         close_op = WorkerOperation()
         close_op.job_id = job_id
         close_op.close = True
@@ -369,7 +377,6 @@ def handle(server: ManagerServer, sock: socket, host_info: HostInformation):
     if host_info.HasField('worker_info'):
         server.logger("[+] Received worker:\n{}".format(host_info))
         server.manager.add_worker(sock, host_info)
-        server.manager.serve_worker(sock, host_info)
     elif host_info.HasField('client_info'):
         server.logger("[+] Received connection:\n{}".format(host_info))
         server.manager.add_client(sock, host_info)
