@@ -51,8 +51,8 @@ class WorkerInstance:
         while True:
             self.logger("[*] Waiting for operation...")
             operation = self.serverapi.receive_operation()
-
             self.logger("[*] Performing operation:")
+            self.logger("Pre state: {}:{}".format(self.state.total_prob(), self.state.state))
             self.logger(operation)
             if operation.HasField('close'):
                 break
@@ -64,12 +64,14 @@ class WorkerInstance:
                     indices, mat = pbmatop_to_matop(matop)
                     mats[indices] = mat
                 self.state.kronselect_dot(mats, input_offset=self.inputstartindex, output_offset=self.outputstartindex)
+                self.state.swap()
 
             elif operation.HasField('total_prob'):
                 # Probability when measuring all bits (0xFFFFFFFF)
                 p = self.state.total_prob()
-                self.serverapi.report_probability(operation.job_id, measured_prob=p)
                 self.logger("[*] Reporting p={}".format(p))
+                self.serverapi.report_probability(operation.job_id, measured_prob=p)
+                self.logger("Post state: {}:{}".format(self.state.total_prob(), self.state.state))
                 continue
 
             elif operation.HasField('measure'):
@@ -85,22 +87,27 @@ class WorkerInstance:
                     if operation.measure.HasField('measure_result'):
                         measured = operation.measure.measure_result.measured_bits
                         measured_prob = operation.measure.measure_result.measured_prob
+                    self.logger("Pre-measure total: {}".format(self.state.total_prob()))
                     m, p = self.state.measure(indices, measured=measured, measured_prob=measured_prob,
                                               input_offset=self.inputstartindex)
+                    self.logger(self.state.state)
+                    self.logger(self.state.arena)
                 self.logger("[*] Reporting m={}\tp={}".format(m,p))
                 self.serverapi.report_probability(operation.job_id, measured_bits=m, measured_prob=p)
+                self.logger("Post state: {}:{}".format(self.state.total_prob(), self.state.state))
                 continue
 
             elif operation.HasField('sync'):
                 # This logic assumes all workers given equal share, if ever changed then this must be fixed.
                 if self.inputstartindex == self.outputstartindex and self.inputendindex == self.outputendindex:
                     self.logger("Sync ====")
-                    # Output becomes input
+                    # Output becomes input TODO there appears to be an issue with syncing and measurement.
                     self.logger("Sync swap")
                     self.state.swap()
 
                     # Receive output from everything which outputs to same region, add to current input
                     self.logger("Sync receive_state_increments_from_all")
+
                     self.pool.receive_state_increments_from_all(self.job_id, self.state,
                                                                 self.outputstartindex, self.outputendindex)
 
@@ -126,7 +133,7 @@ class WorkerInstance:
                                                 self.outputstartindex, self.outputendindex)
 
                     should_receive = True
-                    if operation.sync.HasField('set_up_to'):
+                    if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:
                         if operation.sync.set_up_to <= self.inputendindex or operation.sync.set_up_to <= self.outputendindex:
                             should_receive = False
 
@@ -140,11 +147,13 @@ class WorkerInstance:
             else:
                 raise NotImplemented("Unknown operation: {}".format(operation))
 
+            self.logger("Post state: {}:{}".format(self.state.total_prob(), self.state.state))
             # If didn't override report system (see measurement), report done.
             self.logger("[+] Operation done!")
             self.logger("\tReporting done...")
             self.serverapi.report_done(operation.job_id)
             self.logger("[+] Reported operation complete.")
+            self.logger("[*] New total prob: {}".format(self.state.total_prob()))
         self.pool.close_connections(self.job_id)
         del self.state
 

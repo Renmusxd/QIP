@@ -14,7 +14,7 @@ import uuid
 class Manager:
     INPUT_TIMEOUT = 1
     # TODO smarter allocation
-    WORKER_N = 9
+    WORKER_N = 1
 
     def __init__(self, logger: Callable[[str], None] = print):
         self.logger = logger
@@ -23,7 +23,7 @@ class Manager:
         self.job_pools = {}
 
         # list of workers who aren't in the job_pools
-        # let's assume all workers are the same-ish for now.
+        # let's assume all workers are the same for now.
         self.free_workers = []
         self.worker_lock = Lock()
         self.pool_lock = Lock()
@@ -50,12 +50,13 @@ class Manager:
             while running_job:
                 self.logger("[*] Waiting for operation for job: {}".format(state_handle.state_handle))
                 op = WorkerOperation.FromString(sock.recv())
+                returned_data = None
                 if op.HasField("close"):
                     running_job = False
                 else:
                     with self.pool_lock:
                         pool = self.job_pools[state_handle.state_handle]
-                    returned_workers = pool.send_op(op)
+                    returned_workers, returned_data = pool.send_op(op)
                     if returned_workers:
                         self.logger("[*] Returning {} workers to pool after operation.".format(len(returned_workers)))
                         with self.worker_lock:
@@ -64,6 +65,10 @@ class Manager:
                 self.logger("[*] Sending confirmation to client...")
                 conf = WorkerConfirm()
                 conf.job_id = state_handle.state_handle
+                if returned_data:
+                    measured_bits, measured_prob = returned_data
+                    conf.measure_result.measured_bits = measured_bits
+                    conf.measure_result.measured_prob = measured_prob
                 sock.send(conf.SerializeToString())
         except Exception as e:
             self.logger("[!] Unknown exception: {}".format(e))
@@ -100,6 +105,16 @@ class Manager:
         except ValueError as e:
             state_handle.error_message = str(e)
             return state_handle
+
+    def close(self):
+        self.logger("Closing...")
+        with self.worker_lock:
+            with self.pool_lock:
+                for job_id, pool in self.job_pools.items():
+                    self.free_workers.extend(pool.close(job_id))
+            for worker in self.free_workers:
+                worker.sock.close()
+        self.logger("Closed!")
 
 
 class InsufficientResources(ValueError):
@@ -160,7 +175,7 @@ class WorkerPool:
     def send_op(self, op: WorkerOperation):
         if op.HasField('kronprod'):
             self.send_kronprod(op)
-            return []
+            return [], None
         elif op.HasField('measure'):
             if op.measure.soft:
                 raise NotImplemented("Need to implement soft measurement")
@@ -281,7 +296,7 @@ class WorkerPool:
         self.logger("\tClosed {} workers".format(len(done_workers)))
 
         self.workers = remaining_workers
-        return done_workers
+        return done_workers, (measured_bits, measured_prob)
 
     def send_to_each_of(self, op: WorkerOperation, workers: Iterable['AnnotatedSocket']):
         for worker in workers:
@@ -336,12 +351,13 @@ class ManagerServer:
 
         self.timeout_duration = 1
         self.logger = logger
+        self.running = True
 
     def run(self):
         self.tcpsock.listen(5)
 
         self.logger("[*] Starting up...")
-        while True:
+        while self.running:
             self.logger("[*] Accepting connections...")
             clientsock, (ip, port) = self.tcpsock.accept()
             clientsock.settimeout(self.timeout_duration)
@@ -371,6 +387,10 @@ class ManagerServer:
                     clientsock.close()
                 except IOError as e:
                     self.logger("\tError while closing socket: {}".format(str(e)))
+
+    def stop(self):
+        self.running = False
+        self.manager.close()
 
 
 def handle(server: ManagerServer, sock: socket, host_info: HostInformation):

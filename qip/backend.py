@@ -116,19 +116,21 @@ class CythonBackend(StateType):
                 measured_prob: Optional[float] = None,
                 input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
         # Get an appropriately sized arena
-        numpy.resize(self.arena, (self.arena.shape[0] >> len(indices),))
+        # new_arena_size = 2**(self.n - len(indices))
+        # if new_arena_size < self.arena.shape[0]:
+        #     self.arena.resize((new_arena_size,))
+
         bits, prob = measure(numpy.asarray(indices, dtype=numpy.int32),
                              self.n, self.state, self.arena,
                              measured=measured, measured_prob=measured_prob,
                              input_offset=input_offset, output_offset=output_offset)
-        numpy.resize(self.state, self.arena.shape)
+        # self.state.resize(self.arena.shape)
         self.state, self.arena = self.arena, self.state
 
         return bits, prob
 
     def soft_measure(self, indices: Sequence[int], measured: Optional[int] = None,
                      input_offset: int = 0) -> Tuple[int, float]:
-        # TODO tuple not acceptable?
         return soft_measure(numpy.asarray(indices, dtype=numpy.int32), self.n, self.state,
                             measured=measured, input_offset=input_offset)
 
