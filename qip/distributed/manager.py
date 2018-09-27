@@ -1,8 +1,7 @@
-from qip.distributed.proto import *
 from qip.distributed.proto.conversion import *
 from qip.distributed import formatsock
+from qip.distributed.manager_logger import ServerLogger, PrintLogger
 from collections import OrderedDict
-import itertools
 import random
 import socket
 import ssl
@@ -16,8 +15,11 @@ class Manager:
     # TODO smarter allocation
     WORKER_N = 1
 
-    def __init__(self, logger: Callable[[str], None] = print):
-        self.logger = logger
+    def __init__(self, logger: ServerLogger = None):
+        if logger is None:
+            self.logger = PrintLogger()
+        else:
+            self.logger = logger
 
         # map from state_handle to WorkerPool object
         self.job_pools = {}
@@ -37,19 +39,20 @@ class Manager:
 
     def serve_client(self, sock: socket):
         # Wait for desired state
-        self.logger("[*] Waiting for setup...")
+        self.logger.waiting_for_setup()
         setup = StateSetup.FromString(sock.recv())
-        self.logger("[*] Making state...")
         state_handle = self.make_state(setup)
-        self.logger("\tMade state, sending handle: {}".format(state_handle.state_handle))
+        self.logger.making_state(state_handle.state_handle)
         sock.send(state_handle.SerializeToString())
 
         # Apply operations
         running_job = True
         try:
             while running_job:
-                self.logger("[*] Waiting for operation for job: {}".format(state_handle.state_handle))
+                self.logger.waiting_for_operation(state_handle.state_handle)
                 op = WorkerOperation.FromString(sock.recv())
+                self.logger.running_operation(state_handle.state_handle, op)
+
                 returned_data = None
                 if op.HasField("close"):
                     running_job = False
@@ -58,11 +61,11 @@ class Manager:
                         pool = self.job_pools[state_handle.state_handle]
                     returned_workers, returned_data = pool.send_op(op)
                     if returned_workers:
-                        self.logger("[*] Returning {} workers to pool after operation.".format(len(returned_workers)))
+                        self.logger.returning_workers(state_handle.state_handle, len(returned_workers))
                         with self.worker_lock:
                             self.free_workers.extend(returned_workers)
 
-                self.logger("[*] Sending confirmation to client...")
+                self.logger.done_running_operation(state_handle.state_handle, op)
                 conf = WorkerConfirm()
                 conf.job_id = state_handle.state_handle
                 if returned_data:
@@ -71,28 +74,30 @@ class Manager:
                     conf.measure_result.measured_prob = measured_prob
                 sock.send(conf.SerializeToString())
         except Exception as e:
-            self.logger("[!] Unknown exception: {}".format(e))
+            self.logger.log_error("Unknown exception: {}".format(e))
             conf = WorkerConfirm()
             conf.error_message = str(e)
             try:
                 sock.send(conf.SerializeToString())
             except IOError as e:
-                self.logger("\tError sending error code: {}".format(e))
+                self.logger.log_error("Error sending error code: {}".format(e))
         finally:
             with self.pool_lock:
                 pool = self.job_pools[state_handle.state_handle]
             returned_workers = pool.close(state_handle.state_handle)
 
-            self.logger("[*] Returning {} workers to pool.".format(len(returned_workers)))
+            self.logger.returning_workers(state_handle.state_handle, len(returned_workers))
             with self.worker_lock:
                 self.free_workers.extend(returned_workers)
+
+            self.logger.closing_state(state_handle.state_handle)
             sock.close()
-            self.logger("[*] Socket closed.")
 
     def make_state(self, setup: StateSetup) -> StateHandle:
         n = setup.n
         with self.worker_lock:
             pool = WorkerPool(n, Manager.WORKER_N, logger=self.logger)
+            # TODO catch exception return error to client.
             self.free_workers = pool.draw_workers(self.free_workers)
         state_handle = StateHandle()
         try:
@@ -123,7 +128,7 @@ class InsufficientResources(ValueError):
 
 
 class WorkerPool:
-    def __init__(self, n: int, worker_n: int, logger: Callable[[str], None] = print):
+    def __init__(self, n: int, worker_n: int, logger: ServerLogger):
         self.n = n
         self.worker_n = worker_n
         self.unallocated_workers = []
@@ -134,6 +139,7 @@ class WorkerPool:
         # Assume all equal.
         # Required along one side of matrix is 2**n/2**m == 2**(n-m), so total is that squared == 2**2(n-m) (at least 1)
         required_workers = pow(2, 2 * max(self.n - self.worker_n, 0))
+
         if len(workers) < required_workers:
             raise InsufficientResources("Not enough workers: Has {} but needs {}".format(len(workers), required_workers))
         self.unallocated_workers, remaining_workers = list(workers[:required_workers]), workers[required_workers:]
@@ -143,13 +149,17 @@ class WorkerPool:
     def allocate_workers(self, setup: StateSetup, job_id: str):
         # Now assign ranges
         workern = min(self.worker_n, self.n)
-        workerseps = [i << workern for i in range(self.n - workern + 2)]
+
+        workerseps = [i << workern for i in range(pow(2, self.n - workern) + 1)]
         # list of (x, x + 2**workern)
         workerranges = list(zip(workerseps[:-1], workerseps[1:]))
 
         for inputrange in workerranges:
             for outputrange in workerranges:
                 self.workers.append((inputrange, outputrange, self.unallocated_workers.pop()))
+
+        # Make sure all workers were allocated.
+        assert len(self.unallocated_workers) == 0
 
         workersetup = WorkerSetup()
         workersetup.n = self.n
@@ -221,7 +231,6 @@ class WorkerPool:
         # Get relevant rows which need to output reductions.
         indices = pbindices_to_indices(op.measure.indices)
         threshold = 2**(self.n - len(indices))
-        self.logger("[*] Measurement threshold is {}".format(threshold))
         reduction_workers = self.get_workers_up_to_output(threshold)
 
         # First get all the worker probs
@@ -249,7 +258,7 @@ class WorkerPool:
         first_worker.sock.send(get_bits.SerializeToString())
         conf = WorkerConfirm.FromString(first_worker.sock.recv())
         measured_bits = conf.measure_result.measured_bits
-        self.logger("[*] Measured bits are {}".format(measured_bits))
+        self.logger("Measured bits are {}".format(measured_bits))
         # Measured_prob is at least what was measured for the first worker.
         measured_prob = conf.measure_result.measured_prob
 
@@ -259,7 +268,7 @@ class WorkerPool:
                                 if ins != measured_inputs]
         confs = self.map_workers_via_op(get_bits, measure_prob_workers, throw_errors=True)
         measured_prob += sum(conf.measure_result.measured_prob for conf in confs)
-        self.logger("[*] Measured prob is {}".format(measured_prob))
+        self.logger("Measured prob is {}".format(measured_prob))
 
         # Flatten worker dictionary.
         all_reduction_workers = [worker for workers in reduction_workers.values() for worker in workers]
@@ -270,14 +279,14 @@ class WorkerPool:
         reduce_op.measure.measure_result.measured_bits = measured_bits
         reduce_op.measure.measure_result.measured_prob = measured_prob
         reduce_op.measure.soft = False
-        self.logger("[*] Performing reduction measurement")
+        self.logger("Performing reduction measurement")
         self.map_workers_via_op(reduce_op, all_reduction_workers, throw_errors=True)
 
         # Now sync to smaller worker set and remove unnecessary workers.
         syncop = WorkerOperation()
         syncop.job_id = op.job_id
         syncop.sync.set_up_to = threshold
-        self.logger("[*] Performing synchronization")
+        self.logger("Performing synchronization")
         self.map_workers_via_op(syncop, all_reduction_workers, throw_errors=True)
 
         # Now find which workers need to be returned to the pool.
@@ -286,7 +295,7 @@ class WorkerPool:
         close_op = WorkerOperation()
         close_op.job_id = op.job_id
         close_op.close = True
-        self.logger("[*] Closing obsolete workers...")
+        self.logger("Closing obsolete workers...")
         for inputs, outputs, worker in self.workers:
             if inputs[1] <= threshold and outputs[1] <= threshold:
                 remaining_workers.append((inputs, outputs, worker))
@@ -299,13 +308,13 @@ class WorkerPool:
         return done_workers, (measured_bits, measured_prob)
 
     def send_to_each_of(self, op: WorkerOperation, workers: Iterable['AnnotatedSocket']):
-        for worker in workers:
+        for i, worker in enumerate(workers):
             worker.sock.send(op.SerializeToString())
 
     def receive_from_each_of(self, workers: Iterable['AnnotatedSocket'],
                              throw_errors: bool = True) -> List[WorkerConfirm]:
         confs = []
-        for worker in workers:
+        for i, worker in enumerate(workers):
             conf = WorkerConfirm.FromString(worker.sock.recv())
             confs.append(conf)
             if throw_errors and conf.HasField('error_message'):
@@ -318,13 +327,15 @@ class WorkerPool:
         return self.receive_from_each_of(workers, throw_errors=throw_errors)
 
     def close(self, job_id: str) -> Sequence['AnnotatedSocket']:
-        self.logger("[*] Closing pool with {} workers".format(len(self.workers)))
+        self.logger("Closing pool with {} workers".format(len(self.workers)))
         close_op = WorkerOperation()
         close_op.job_id = job_id
         close_op.close = True
         for _, _, worker in self.workers:
             worker.sock.send(close_op.SerializeToString())
-        return [w for _, _, w in self.workers]
+        freed_workers = [w for _, _, w in self.workers]
+        self.workers = []
+        return freed_workers
 
 
 class AnnotatedSocket:
@@ -338,7 +349,12 @@ class AnnotatedSocket:
 
 class ManagerServer:
     def __init__(self, host: str, port: int, manager: Manager,
-                 certfile: str = None, keyfile: str = None, logger: Callable[[str], None] = print):
+                 certfile: str = None, keyfile: str = None, logger: ServerLogger = None):
+        if logger is None:
+            self.logger = PrintLogger()
+        else:
+            self.logger = logger
+
         self.manager = manager
 
         self.tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -350,23 +366,21 @@ class ManagerServer:
         self.keyfile = keyfile
 
         self.timeout_duration = 1
-        self.logger = logger
+
         self.running = True
 
     def run(self):
         self.tcpsock.listen(5)
-
-        self.logger("[*] Starting up...")
+        self.logger.starting_server()
         while self.running:
-            self.logger("[*] Accepting connections...")
+            self.logger.accepting_connections()
             clientsock, (ip, port) = self.tcpsock.accept()
             clientsock.settimeout(self.timeout_duration)
             try:
-                self.logger("[+] Accepted connection!")
-                self.logger("\tSending SSL: " + ('ON' if self.ssl else 'OFF'))
+                self.logger.accepted_connection(bool(self.ssl))
+
                 clientsock.send(b'\x01' if self.ssl else b'\x00')
                 if self.ssl:
-                    self.logger("\tWrapping socket...")
                     clientsock = ssl.wrap_socket(
                         clientsock,
                         server_side=True,
@@ -375,18 +389,17 @@ class ManagerServer:
                     )
                 clientformatsock = formatsock.FormatSocket(clientsock)
                 clientformatsock.settimeout(None)
-                self.logger('\tWaiting for client information...')
                 host_info = HostInformation.FromString(clientformatsock.recv())
                 host_info.address = ip
                 host_info.port = port
                 t = Thread(target=handle, args=(self, clientformatsock, host_info))
                 t.start()
             except IOError as e:
-                self.logger("[!] Error accepting connection: {}".format(str(e)))
+                self.logger.log_error("Error accepting connection: {}".format(str(e)))
                 try:
                     clientsock.close()
                 except IOError as e:
-                    self.logger("\tError while closing socket: {}".format(str(e)))
+                    self.logger.log_error("Error while closing socket: {}".format(str(e)))
 
     def stop(self):
         self.running = False
@@ -395,10 +408,10 @@ class ManagerServer:
 
 def handle(server: ManagerServer, sock: socket, host_info: HostInformation):
     if host_info.HasField('worker_info'):
-        server.logger("[+] Received worker:\n{}".format(host_info))
+        server.logger.received_worker(host_info)
         server.manager.add_worker(sock, host_info)
     elif host_info.HasField('client_info'):
-        server.logger("[+] Received connection:\n{}".format(host_info))
+        server.logger.received_client(host_info)
         server.manager.add_client(sock, host_info)
         server.manager.serve_client(sock)
 

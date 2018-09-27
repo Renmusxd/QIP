@@ -2,6 +2,7 @@
 from qip.distributed.proto import *
 from qip.distributed.proto.conversion import *
 from qip.distributed.worker.worker_backends import SocketServerBackend, SocketWorkerBackend
+from qip.distributed.worker.worker_logger import WorkerLogger, PrintLogger
 from qip.distributed.formatsock import FormatSocket
 from qip.backend import CythonBackend, StateType
 import socket
@@ -14,12 +15,17 @@ import sys
 class WorkerInstance:
     """A class created to serve a particular circuit + state."""
     def __init__(self, serverapi: SocketServerBackend, workerpool: 'WorkerPoolServer',
-                 setup: WorkerSetup, logger: Callable[[str], None] = print):
+                 setup: WorkerSetup, logger: WorkerLogger = None):
         """
         Create the WorkerInstance
         :param serverapi: backend class to communicate with the host that processes are done.
         :param setup: Setup provided by manager
         """
+        if logger is None:
+            self.logger = PrintLogger()
+        else:
+            self.logger = logger
+
         self.serverapi = serverapi
         self.n = setup.n
         self.job_id = setup.state_handle
@@ -28,7 +34,6 @@ class WorkerInstance:
         self.outputstartindex = setup.output_index_start
         self.outputendindex = setup.output_index_end
         self.pool = workerpool
-        self.logger = logger
         indexgroups = list(pbindices_to_indices(state.indices) for state in setup.states)
         feedstates = [get_state_value(state) for state in setup.states]
 
@@ -49,10 +54,10 @@ class WorkerInstance:
 
     def run(self):
         while True:
-            self.logger("[*] Waiting for operation...")
+            self.logger.waiting_for_operation(self.job_id)
             operation = self.serverapi.receive_operation()
-            self.logger("[*] Performing operation:")
-            self.logger("Pre state: {}:{}".format(self.state.total_prob(), self.state.state))
+            self.logger.running_operation(self.job_id, operation)
+
             self.logger(operation)
             if operation.HasField('close'):
                 break
@@ -64,14 +69,12 @@ class WorkerInstance:
                     indices, mat = pbmatop_to_matop(matop)
                     mats[indices] = mat
                 self.state.kronselect_dot(mats, input_offset=self.inputstartindex, output_offset=self.outputstartindex)
-                self.state.swap()
 
             elif operation.HasField('total_prob'):
                 # Probability when measuring all bits (0xFFFFFFFF)
                 p = self.state.total_prob()
-                self.logger("[*] Reporting p={}".format(p))
+                self.logger("Reporting p={}".format(p))
                 self.serverapi.report_probability(operation.job_id, measured_prob=p)
-                self.logger("Post state: {}:{}".format(self.state.total_prob(), self.state.state))
                 continue
 
             elif operation.HasField('measure'):
@@ -87,59 +90,41 @@ class WorkerInstance:
                     if operation.measure.HasField('measure_result'):
                         measured = operation.measure.measure_result.measured_bits
                         measured_prob = operation.measure.measure_result.measured_prob
-                    self.logger("Pre-measure total: {}".format(self.state.total_prob()))
                     m, p = self.state.measure(indices, measured=measured, measured_prob=measured_prob,
                                               input_offset=self.inputstartindex)
-                    self.logger(self.state.state)
-                    self.logger(self.state.arena)
-                self.logger("[*] Reporting m={}\tp={}".format(m,p))
+                self.logger("Reporting m={}\tp={}".format(m,p))
                 self.serverapi.report_probability(operation.job_id, measured_bits=m, measured_prob=p)
-                self.logger("Post state: {}:{}".format(self.state.total_prob(), self.state.state))
                 continue
 
             elif operation.HasField('sync'):
                 # This logic assumes all workers given equal share, if ever changed then this must be fixed.
                 if self.inputstartindex == self.outputstartindex and self.inputendindex == self.outputendindex:
-                    self.logger("Sync ====")
-                    # Output becomes input TODO there appears to be an issue with syncing and measurement.
-                    self.logger("Sync swap")
-                    self.state.swap()
-
                     # Receive output from everything which outputs to same region, add to current input
-                    self.logger("Sync receive_state_increments_from_all")
-
                     self.pool.receive_state_increments_from_all(self.job_id, self.state,
                                                                 self.outputstartindex, self.outputendindex)
 
                     # Send current input to everything which takes input from same region.
                     if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:
-                        self.logger("Sync send_state_up_to")
                         self.pool.send_state_up_to(self.job_id, self.state, self.inputstartindex, self.inputendindex,
                                                    operation.sync.set_up_to)
                     else:
-                        self.logger("Sync send_state_to_all")
                         self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex)
 
                 else:
-                    self.logger("Sync else")
                     # Swap input and output
-                    self.logger("Sync swap")
-                    self.state.swap()
-
                     # Send current output to worker along diagonal with in/out equal to our output
-                    self.logger("Sync send_state_to_one")
                     self.pool.send_state_to_one(self.job_id, self.state,
                                                 self.outputstartindex, self.outputendindex,
                                                 self.outputstartindex, self.outputendindex)
 
                     should_receive = True
                     if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:
-                        if operation.sync.set_up_to <= self.inputendindex or operation.sync.set_up_to <= self.outputendindex:
-                            should_receive = False
+                        should_receive = False
+                        if operation.sync.set_up_to >= self.inputendindex and operation.sync.set_up_to >= self.outputendindex:
+                            should_receive = True
 
                     if should_receive:
                         # Receive new input from worker with in/out equal to our input. Set to current input.
-                        self.logger("Sync receive_state_from_one")
                         self.pool.receive_state_from_one(self.job_id, self.state,
                                                          self.inputstartindex, self.inputendindex,
                                                          self.inputstartindex, self.inputendindex)
@@ -147,13 +132,9 @@ class WorkerInstance:
             else:
                 raise NotImplemented("Unknown operation: {}".format(operation))
 
-            self.logger("Post state: {}:{}".format(self.state.total_prob(), self.state.state))
             # If didn't override report system (see measurement), report done.
-            self.logger("[+] Operation done!")
-            self.logger("\tReporting done...")
+            self.logger.done_running_operation(self.job_id, operation)
             self.serverapi.report_done(operation.job_id)
-            self.logger("[+] Reported operation complete.")
-            self.logger("[*] New total prob: {}".format(self.state.total_prob()))
         self.pool.close_connections(self.job_id)
         del self.state
 
@@ -166,13 +147,18 @@ def get_state_value(state: State) -> Union[numpy.ndarray, int]:
 
 
 class WorkerPoolServer(Thread):
-    def __init__(self, hostname: str = '0.0.0.0', port: int = 0, logger: Callable[[str], None] = print):
+    def __init__(self, hostname: str = '0.0.0.0', port: int = 0, logger: WorkerLogger = None):
         """
         Create a server and pool object for finding connections to other workers.
         :param hostname: address to contact this worker
         :param port: port to bind to (0 default means choose any open).
         """
         super().__init__()
+        if logger is None:
+            self.logger = PrintLogger()
+        else:
+            self.logger = logger
+
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((hostname, port))
         self.addr = hostname
@@ -185,18 +171,17 @@ class WorkerPoolServer(Thread):
         # Full range
         self.workers = {}
 
-        self.logger = logger
-
         self.workerlock = Lock()
 
     def run(self):
+        self.logger.starting_server()
         self.sock.listen(5)
-        self.logger("[*] Listening on {}:{}".format(self.addr, self.port))
+        self.logger.accepting_connections()
         while True:
             sock, _ = self.sock.accept()
             sock = FormatSocket(sock)
             workersetup = WorkerPartner.FromString(sock.recv())
-            self.logger("[*] Accepting partner:\n{}".format(workersetup))
+            self.logger.accepted_connection()
 
             fullkey = (workersetup.job_id, workersetup.state_index_start, workersetup.state_index_end,
                        workersetup.output_index_start, workersetup.output_index_end)
@@ -221,10 +206,10 @@ class WorkerPoolServer(Thread):
                 if sockkey in self.workers:
                     sock = self.workers[sockkey]
         if sock is not None:
-            self.logger("[*] Sending state to {}".format(sockkey))
+            self.logger("Sending state to {}".format(sockkey))
             self.send_state(job_id, state, sock)
         else:
-            self.logger("[*] Cannot send - No socket for {}".format(sockkey))
+            self.logger.log_error("Cannot send - No socket for {}".format(sockkey))
 
     def send_state_to_all(self, job_id: str, state: CythonBackend, start: int, end: int,
                           inputdefined=True):
@@ -238,20 +223,17 @@ class WorkerPoolServer(Thread):
             with self.workerlock:
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
-        self.logger("[*] Sending state to {} workers...".format(len(socks)))
+        self.logger("Sending state to {} workers...".format(len(socks)))
         for i, (sock, _, _) in enumerate(socks):
             self.logger("\tSending to worker #{}".format(i))
             self.send_state(job_id, state, sock)
 
     def send_state_up_to(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int, threshold: int = 0):
         rangekey = (job_id, inputstart, inputend)
-        self.logger("send_state_up_to before lock")
         with self.workerlock:
-            self.logger("send_state_up_to after lock")
             for sock, outputstart, outputend in self.inputrange_workers[rangekey]:
                 if outputstart >= threshold:
                     continue
-                self.logger("Sending to outputs: {}:{}".format(outputstart, outputend))
                 self.send_state(job_id, state, sock)
 
     def receive_state_from_one(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int,
@@ -262,10 +244,10 @@ class WorkerPoolServer(Thread):
             if rangekey in self.workers:
                 sock = self.workers[rangekey]
         if sock is not None:
-            self.logger("[*] Receiving state from {}".format(rangekey))
+            self.logger("Receiving state from {}".format(rangekey))
             self.receive_state(job_id, state, sock, overwrite=True)
         else:
-            self.logger("[*] Cannot receive - No socket for {}".format(rangekey))
+            self.logger.log_error("Cannot receive - No socket for {}".format(rangekey))
 
     def receive_state_increments_from_all(self, job_id: str, state: CythonBackend,
                                           start: int, end: int, inputdefined=False):
@@ -279,7 +261,7 @@ class WorkerPoolServer(Thread):
             with self.workerlock:
                 if rangekey in self.outputrange_workers:
                     socks = self.outputrange_workers[rangekey]
-        self.logger("[*] Receiving state from {} workers...".format(len(socks)))
+        self.logger("Receiving state from {} workers...".format(len(socks)))
         for sock, _, _ in socks:
             self.receive_state(job_id, state, sock, overwrite=False)
 
@@ -343,7 +325,7 @@ class WorkerPoolServer(Thread):
 
     def make_connection(self, job_id: str, myinputstart: int, myinputend: int, myoutputstart: int, myoutputend: int,
                         partner: WorkerPartner):
-        self.logger("[*] Connecting to:\n{}".format(str(partner)))
+        self.logger("Connecting to: {}".format(str(partner)))
         wp = WorkerPartner()
         wp.job_id = job_id
         wp.state_index_start = myinputstart
@@ -391,8 +373,14 @@ class WorkerPoolServer(Thread):
 
 class WorkerRunner(Thread):
     def __init__(self, addr: str = 'localhost', port: int = 1708, bindaddr: str = 'localhost', bindport: int = 0,
-                 logger: Callable[[str], None] = print):
+                 logger: WorkerLogger = None):
         super().__init__()
+
+        if logger is None:
+            self.logger = PrintLogger()
+        else:
+            self.logger = logger
+
         sock = socket.socket()
         sock.connect((addr, port))
         b = sock.recv(1)
@@ -412,15 +400,14 @@ class WorkerRunner(Thread):
         self.serverapi = SocketServerBackend(self.socket)
         self.addr = addr
         self.port = port
-
-        self.logger = logger
+        self.running = True
 
     def run(self):
-        self.logger("[*] Starting up...")
-        while True:
-            self.logger("[*] Waiting for setup...")
+
+        while self.running:
+            self.logger.waiting_for_setup()
             setup = WorkerSetup.FromString(self.socket.recv())
-            self.logger("[+] Setup: {}".format(setup))
+            self.logger.accepted_setup(setup)
             worker = WorkerInstance(self.serverapi, self.pool, setup, logger=self.logger)
             worker.run()
 

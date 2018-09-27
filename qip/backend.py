@@ -9,7 +9,7 @@ import numpy
 from typing import Sequence, Mapping, Callable, Optional, Tuple
 
 
-class StateType:
+class StateType(object):
     def __init__(self, n: int, state: object):
         self.n = n
         self.state = state
