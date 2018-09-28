@@ -86,6 +86,7 @@ class DistributedBackend(StateType):
                 measured_prob: Optional[float] = None,
                 input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
         workerop = WorkerOperation()
+        workerop.job_id = self.state
         indices_to_pbindices(indices, workerop.measure.indices)
 
         self.socket.send(workerop.SerializeToString())
@@ -108,4 +109,3 @@ class DistributedBackend(StateType):
         close_op.close = True
         self.socket.send(close_op.SerializeToString())
         self.socket.close()
-

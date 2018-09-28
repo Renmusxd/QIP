@@ -302,7 +302,7 @@ class WorkerPool:
             else:
                 worker.sock.send(close_op.SerializeToString())
                 done_workers.append(worker)
-        self.logger("\tClosed {} workers".format(len(done_workers)))
+        self.logger("Closed {} workers".format(len(done_workers)))
 
         self.workers = remaining_workers
         return done_workers, (measured_bits, measured_prob)
