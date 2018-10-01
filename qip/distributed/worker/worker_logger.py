@@ -33,7 +33,7 @@ class WorkerLogger(object):
     def accepted_setup(self, setup: WorkerSetup):
         self.log_string("Setup: {}".format(setup))
 
-    def making_state(self, handle: str):
+    def making_state(self, handle: str, input_start: int, input_end: int, output_start: int, output_end: int):
         self.log_string("Making state {}".format(handle))
 
     def closing_state(self, handle: str):
@@ -47,6 +47,12 @@ class WorkerLogger(object):
 
     def done_running_operation(self, handle: str, op: WorkerOperation):
         self.log_string("Done running operation for {}".format(handle))
+
+    def sending_state(self, handle: str):
+        self.log_string("Sending state for {}".format(handle))
+
+    def receiving_state(self, handle: str):
+        self.log_string("Receiving state for {}".format(handle))
 
 
 class PrintLogger(WorkerLogger):

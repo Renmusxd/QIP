@@ -42,7 +42,7 @@ class Manager:
         self.logger.waiting_for_setup()
         setup = StateSetup.FromString(sock.recv())
         state_handle = self.make_state(setup)
-        self.logger.making_state(state_handle.state_handle)
+        self.logger.making_state(state_handle.state_handle, setup.n)
         sock.send(state_handle.SerializeToString())
 
         # Apply operations

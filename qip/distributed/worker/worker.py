@@ -47,6 +47,8 @@ class WorkerInstance:
                     self.pool.make_connection(self.job_id, self.inputstartindex, self.inputendindex,
                                               self.outputstartindex, self.outputendindex, partner)
 
+        self.logger.making_state(self.job_id, self.inputstartindex, self.inputendindex,
+                                 self.outputstartindex, self.outputendindex)
         self.state = CythonBackend.make_state(self.n, indexgroups, feedstates,
                                               inputstartindex=self.inputstartindex, inputendindex=self.inputendindex,
                                               outputstartindex=self.outputstartindex, outputendindex=self.outputendindex,
@@ -100,19 +102,23 @@ class WorkerInstance:
                 # This logic assumes all workers given equal share, if ever changed then this must be fixed.
                 if self.inputstartindex == self.outputstartindex and self.inputendindex == self.outputendindex:
                     # Receive output from everything which outputs to same region, add to current input
+                    self.logger.receiving_state(self.job_id)
                     self.pool.receive_state_increments_from_all(self.job_id, self.state,
                                                                 self.outputstartindex, self.outputendindex)
 
                     # Send current input to everything which takes input from same region.
                     if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:
+                        self.logger.sending_state(self.job_id)
                         self.pool.send_state_up_to(self.job_id, self.state, self.inputstartindex, self.inputendindex,
                                                    operation.sync.set_up_to)
                     else:
+                        self.logger.sending_state(self.job_id)
                         self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex)
 
                 else:
                     # Swap input and output
                     # Send current output to worker along diagonal with in/out equal to our output
+                    self.logger.sending_state(self.job_id)
                     self.pool.send_state_to_one(self.job_id, self.state,
                                                 self.outputstartindex, self.outputendindex,
                                                 self.outputstartindex, self.outputendindex)
@@ -125,6 +131,7 @@ class WorkerInstance:
 
                     if should_receive:
                         # Receive new input from worker with in/out equal to our input. Set to current input.
+                        self.logger.receiving_state(self.job_id)
                         self.pool.receive_state_from_one(self.job_id, self.state,
                                                          self.inputstartindex, self.inputendindex,
                                                          self.inputstartindex, self.inputendindex)

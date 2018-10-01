@@ -37,8 +37,8 @@ class ServerLogger(object):
     def waiting_for_setup(self):
         self.log_string("Waiting for setup.")
 
-    def making_state(self, handle: str):
-        self.log_string("Making state {}".format(handle))
+    def making_state(self, handle: str, n: int):
+        self.log_string("Making {} qubit state {}".format(n, handle))
 
     def closing_state(self, handle: str):
         self.log_string("Closing client {}".format(handle))
