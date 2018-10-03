@@ -229,7 +229,6 @@ class WorkerPool:
     def get_workers_up_to_output(self, threshold: int) -> Mapping[Tuple[int, int], List['AnnotatedSocket']]:
         reduction_workers = OrderedDict()
         for inputs, outputs, worker in self.workers:
-            print(inputs, outputs, worker)
             if outputs[0] > threshold:
                 continue
             if inputs not in reduction_workers:
@@ -242,7 +241,6 @@ class WorkerPool:
         indices = pbindices_to_indices(op.measure.indices)
         threshold = pow(2, self.n - len(indices))
 
-        print(indices, threshold)
         reduction_workers = self.get_workers_up_to_output(threshold)
 
         # First get all the worker probs
