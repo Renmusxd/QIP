@@ -26,11 +26,11 @@ if has_openmp:
         # OSX is hard
         print("!!! OpenMP on OSX can be tricky, make sure to install it using [brew install libomp] !!!")
         print("!!! if compilation/runtime fails you can unset OPENMP environment variable to        !!!")
-        print("!!! disable openmp, or else specify an install location with 'export OPENMP=...'     !!!")
+        print("!!! disable openmp, or else specify an install location with 'export OPENMP_PATH=...'!!!")
         parallel_flags = ['-Xclang', '-fopenmp', '-lomp']
         if 'OPENMP_PATH' in os.environ:
-            parallel_flags += ['-I'+os.path.join(os.environ['OPENMP'],'include')]
-            parallel_flags += ['-L' + os.path.join(os.environ['OPENMP'], 'lib/libomp.dylib')]
+            parallel_flags += ['-I'+os.path.join(os.environ['OPENMP_PATH'], 'include')]
+            parallel_flags += ['-L' + os.path.join(os.environ['OPENMP_PATH'], 'lib/libomp.dylib')]
     else:
         # Linux is easy
         parallel_flags = ['-fopenmp']
