@@ -142,6 +142,7 @@ class WorkerInstance:
             # If didn't override report system (see measurement), report done.
             self.logger.done_running_operation(self.job_id, operation)
             self.serverapi.report_done(operation.job_id)
+        self.logger.closing_state(self.job_id)
         self.pool.close_connections(self.job_id)
         del self.state
 
@@ -238,6 +239,9 @@ class WorkerPoolServer(Thread):
     def send_state_up_to(self, job_id: str, state: CythonBackend, inputstart: int, inputend: int, threshold: int = 0):
         rangekey = (job_id, inputstart, inputend)
         with self.workerlock:
+            # We are either alone or broken.
+            if rangekey not in self.inputrange_workers:
+                return
             for sock, outputstart, outputend in self.inputrange_workers[rangekey]:
                 if outputstart >= threshold:
                     continue
@@ -420,7 +424,11 @@ class WorkerRunner(Thread):
 
 
 if __name__ == "__main__":
-    host, port = sys.argv[1], int(sys.argv[2])
+    host, port = 'localhost', 1708
+    if len(sys.argv) > 1:
+        host = sys.argv[1]
+    if len(sys.argv) > 2:
+        port = int(sys.argv[2])
     wr = WorkerRunner(host, port)
     wr.start()
     wr.join()

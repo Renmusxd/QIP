@@ -12,8 +12,6 @@ import uuid
 
 class Manager:
     INPUT_TIMEOUT = 1
-    # TODO smarter allocation
-    WORKER_N = 1
 
     def __init__(self, logger: ServerLogger = None):
         if logger is None:
@@ -73,7 +71,7 @@ class Manager:
                     conf.measure_result.measured_bits = measured_bits
                     conf.measure_result.measured_prob = measured_prob
                 sock.send(conf.SerializeToString())
-        except Exception as e:
+        except IOError as e:
             self.logger.log_error("Unknown exception: {}".format(e))
             conf = WorkerConfirm()
             conf.error_message = str(e)
@@ -96,7 +94,7 @@ class Manager:
     def make_state(self, setup: StateSetup) -> StateHandle:
         n = setup.n
         with self.worker_lock:
-            pool = WorkerPool(n, Manager.WORKER_N, logger=self.logger)
+            pool = WorkerPool(n, logger=self.logger)
             # TODO catch exception return error to client.
             self.free_workers = pool.draw_workers(self.free_workers)
         state_handle = StateHandle()
@@ -128,27 +126,38 @@ class InsufficientResources(ValueError):
 
 
 class WorkerPool:
-    def __init__(self, n: int, worker_n: int, logger: ServerLogger):
+    def __init__(self, n: int, logger: ServerLogger):
         self.n = n
-        self.worker_n = worker_n
         self.unallocated_workers = []
         self.workers = []
         self.logger = logger
+        self.min_worker_n = 0
 
     def draw_workers(self, workers: Sequence['AnnotatedSocket']) -> Sequence['AnnotatedSocket']:
+        # Sort by n_qubits and draw from back using pop()
+        copy_workers = list(sorted((w for w in workers), key=lambda w: w.info.worker_info.n_qubits))
+        self.unallocated_workers = [copy_workers.pop()]
+        worker_n = self.unallocated_workers[0].info.worker_info.n_qubits
+
         # Assume all equal.
         # Required along one side of matrix is 2**n/2**m == 2**(n-m), so total is that squared == 2**2(n-m) (at least 1)
-        required_workers = pow(2, 2 * max(self.n - self.worker_n, 0))
+        required_workers = pow(2, 2 * max(self.n - worker_n, 0))
+        while len(self.unallocated_workers) < required_workers and len(copy_workers) > 0:
+            to_pop = required_workers - len(self.unallocated_workers)
+            for _ in range(to_pop):
+                self.unallocated_workers.append(copy_workers.pop())
+            # Get the new lowest worker_n and the required number of workers at that n.
+            worker_n = self.unallocated_workers[-1].info.worker_info.n_qubits
+            required_workers = pow(2, 2 * max(self.n - worker_n, 0))
 
         if len(workers) < required_workers:
             raise InsufficientResources("Not enough workers: Has {} but needs {}".format(len(workers), required_workers))
-        self.unallocated_workers, remaining_workers = list(workers[:required_workers]), workers[required_workers:]
-
-        return remaining_workers
+        self.min_worker_n = worker_n
+        return copy_workers
 
     def allocate_workers(self, setup: StateSetup, job_id: str):
         # Now assign ranges
-        workern = min(self.worker_n, self.n)
+        workern = min(self.min_worker_n, self.n)
 
         workerseps = [i << workern for i in range(pow(2, self.n - workern) + 1)]
         # list of (x, x + 2**workern)
@@ -220,7 +229,8 @@ class WorkerPool:
     def get_workers_up_to_output(self, threshold: int) -> Mapping[Tuple[int, int], List['AnnotatedSocket']]:
         reduction_workers = OrderedDict()
         for inputs, outputs, worker in self.workers:
-            if outputs[1] > threshold:
+            print(inputs, outputs, worker)
+            if outputs[0] > threshold:
                 continue
             if inputs not in reduction_workers:
                 reduction_workers[inputs] = []
@@ -230,7 +240,9 @@ class WorkerPool:
     def send_reduce_measure(self, op: WorkerOperation):
         # Get relevant rows which need to output reductions.
         indices = pbindices_to_indices(op.measure.indices)
-        threshold = 2**(self.n - len(indices))
+        threshold = pow(2, self.n - len(indices))
+
+        print(indices, threshold)
         reduction_workers = self.get_workers_up_to_output(threshold)
 
         # First get all the worker probs
