@@ -258,6 +258,31 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+def measure_top_probabilities(int[:] indices, int n, int m, double complex[:] vec):
+    measure_mheap = np.zeros(shape=(m,), dtype=np.float64)
+    measure_pheap = np.zeros(shape=(m,), dtype=np.float64)
+
+    cdef:
+        int[:] ms = measure_mheap
+        double[:] ps = measure_pheap
+        int len_indices = indices.shape[0]
+        int iter_num = 2**n
+        int i, j
+        int p_index = 0
+        double complex vec_val
+    with nogil:
+        # Iterating over larger array in order likely better for cache.
+        for i in range(iter_num):
+            vec_val = vec[i]
+            if vec_val == 0.0:
+                continue
+            p_index = entwine_bit(len_indices, 0, i, 0, -1)
+            p[p_index] = p[p_index] + abs(vec_val)**2
+    return measure_p
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def prob_magnitude(double complex[:] vec):
     cdef int i
     cdef double acc

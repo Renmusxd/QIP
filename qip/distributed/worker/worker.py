@@ -60,6 +60,9 @@ class WorkerInstance:
             operation = self.serverapi.receive_operation()
             self.logger.running_operation(self.job_id, operation)
 
+            print(self.state.state)
+            print(self.state.arena)
+
             self.logger(operation)
             if operation.HasField('close'):
                 break
@@ -93,7 +96,8 @@ class WorkerInstance:
                         measured = operation.measure.measure_result.measured_bits
                         measured_prob = operation.measure.measure_result.measured_prob
                     m, p = self.state.reduce_measure(indices, measured=measured, measured_prob=measured_prob,
-                                                     input_offset=self.inputstartindex)
+                                                     input_offset=self.inputstartindex,
+                                                     output_offset=self.outputstartindex)
                 else:
                     measured = None
                     measured_prob = None
@@ -101,7 +105,8 @@ class WorkerInstance:
                         measured = operation.measure.measure_result.measured_bits
                         measured_prob = operation.measure.measure_result.measured_prob
                     m, p = self.state.measure(indices, measured=measured, measured_prob=measured_prob,
-                                              input_offset=self.inputstartindex)
+                                              input_offset=self.inputstartindex,
+                                              output_offset=self.outputstartindex)
 
                 # For any measurement, report the bits and probabilty then continue (don't report_done).
                 self.logger("Reporting m={}\tp={}".format(m, p))
@@ -398,7 +403,7 @@ class WorkerPoolServer(Thread):
 
 class WorkerRunner(Thread):
     def __init__(self, addr: str = 'localhost', port: int = 1708, bindaddr: str = 'localhost', bindport: int = 0,
-                 logger: WorkerLogger = None):
+                 worker_n: int = 28, logger: WorkerLogger = None):
         super().__init__()
 
         if logger is None:
@@ -417,7 +422,7 @@ class WorkerRunner(Thread):
         self.pool.start()
 
         workerinfo = HostInformation()
-        workerinfo.worker_info.n_qubits = 28
+        workerinfo.worker_info.n_qubits = worker_n
         workerinfo.worker_info.address = self.pool.addr
         workerinfo.worker_info.port = self.pool.port
 

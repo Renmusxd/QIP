@@ -242,10 +242,9 @@ class TestQubitMethods(unittest.TestCase):
         n1 = Not(q1)
         n2 = H(q2)
         n3 = Not(q3)
-        o1, _ = run(n1,n2,n3, feed={q1: [1.0, 0.0], q2: [1.0, 0.0],
-                                 q3: [1.0, 0.0, 0.0, 0.0,
-                                      0.0, 0.0, 0.0, 0.0]})
-
+        o1, _ = run(n1, n2, n3, feed={q1: [1.0, 0.0], q2: [1.0, 0.0],
+                                      q3: [1.0, 0.0, 0.0, 0.0,
+                                           0.0, 0.0, 0.0, 0.0]})
         q1 = Qubit(n=1)
         q2 = Qubit(n=1)
         q3 = Qubit(n=3)
@@ -253,9 +252,9 @@ class TestQubitMethods(unittest.TestCase):
         n2 = H(q2)
         n3 = Not(q3)
         n1 = Not(q1)
-        o2, _ = run(n1,n2,n3, feed={q1: [1.0, 0.0], q2: [1.0, 0.0],
-                                 q3: [1.0, 0.0, 0.0, 0.0,
-                                      0.0, 0.0, 0.0, 0.0]})
+        o2, _ = run(n1, n2, n3, feed={q1: [1.0, 0.0], q2: [1.0, 0.0],
+                                      q3: [1.0, 0.0, 0.0, 0.0,
+                                           0.0, 0.0, 0.0, 0.0]})
 
         self.assertTrue(numpy.allclose(o1, o2))
 
@@ -300,7 +299,7 @@ class TestQubitMethods(unittest.TestCase):
         m1 = StochasticMeasure(q2)
         _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
                                  q2: [0.5, 0.5, 0.5, 0.5]})
-        self.assertTrue(numpy.allclose(c[m1], [0.25,0.25,0.25,0.25]))
+        self.assertTrue(numpy.allclose(c[m1], [0.25, 0.25, 0.25, 0.25]))
 
     def test_fop(self):
         n = 2
@@ -356,10 +355,10 @@ class TestQubitMethods(unittest.TestCase):
         q3 = Qubit(n=1)
 
         # CCNOT
-        c1, c2, c3 = C(C(Not))(q1,q2,q3)
+        c1, c2, c3 = C(C(Not))(q1, q2, q3)
 
-        o, c = run(c1, c2, c3, feed={q1: [pow(2, -0.5),pow(2, -0.5)],
-                                     q2: [pow(2,-0.5), pow(2, -0.5)]})
+        o, c = run(c1, c2, c3, feed={q1: [pow(2, -0.5), pow(2, -0.5)],
+                                     q2: [pow(2, -0.5), pow(2, -0.5)]})
         self.assertTrue(numpy.allclose(numpy.abs(o), [0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5]))
 
 

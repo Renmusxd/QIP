@@ -239,8 +239,7 @@ class WorkerPool:
         return reduction_workers
 
     def send_measure(self, op: WorkerOperation):
-        indices = pbindices_to_indices(op.measure.indices)
-
+        print(self.workers)
         diagonal_workers = list(sorted((inputs, outputs, workers) for inputs, outputs, workers in self.workers
                                        if inputs == outputs))
         diagonal_worker_objs = [w for _, _, w in diagonal_workers]
@@ -248,13 +247,14 @@ class WorkerPool:
         probop = WorkerOperation()
         probop.total_prob = True
         probop.job_id = op.job_id  # Part of same job
-        inputs = [inputs for inputs, _, _ in diagonal_workers]
         confs = self.map_workers_via_op(probop, diagonal_worker_objs, throw_errors=True)
 
         r = random.random()
         selected_worker = None
         i = 0
+        print(r)
         for i, conf in enumerate(confs):
+            print(conf)
             r -= conf.measure_result.measured_prob
             if r <= 0:
                 _, _, selected_worker = diagonal_workers[i]
