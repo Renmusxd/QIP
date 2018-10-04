@@ -198,8 +198,10 @@ class WorkerPool:
         elif op.HasField('measure'):
             if op.measure.soft:
                 raise NotImplemented("Need to implement soft measurement")
-            else:
+            elif op.measure.reduce:
                 return self.send_reduce_measure(op)
+            else:
+                return self.send_measure(op)
 
     def send_kronprod(self, op: WorkerOperation):
         # Send to all
@@ -236,6 +238,64 @@ class WorkerPool:
             reduction_workers[inputs].append(worker)
         return reduction_workers
 
+    def send_measure(self, op: WorkerOperation):
+        indices = pbindices_to_indices(op.measure.indices)
+
+        diagonal_workers = list(sorted((inputs, outputs, workers) for inputs, outputs, workers in self.workers
+                                       if inputs == outputs))
+        diagonal_worker_objs = [w for _, _, w in diagonal_workers]
+        # First get all the worker probs
+        probop = WorkerOperation()
+        probop.total_prob = True
+        probop.job_id = op.job_id  # Part of same job
+        inputs = [inputs for inputs, _, _ in diagonal_workers]
+        confs = self.map_workers_via_op(probop, diagonal_worker_objs, throw_errors=True)
+
+        r = random.random()
+        selected_worker = None
+        i = 0
+        for i, conf in enumerate(confs):
+            r -= conf.measure_result.measured_prob
+            if r <= 0:
+                _, _, selected_worker = diagonal_workers[i]
+                break
+        get_bits = WorkerOperation()
+        get_bits.CopyFrom(op)
+        get_bits.measure.soft = True
+        get_bits.measure.reduce = False
+        selected_worker.sock.send(get_bits.SerializeToString())
+        conf = WorkerConfirm.FromString(selected_worker.sock.recv())
+        measured_bits = conf.measure_result.measured_bits
+        measured_prob = conf.measure_result.measured_prob
+        self.logger("Measured bits are {}".format(measured_bits))
+
+        # Accumulate probability from each worker (except the one that was already measured).
+        get_bits.measure.measure_result.measured_bits = measured_bits
+        noprob_workers = diagonal_worker_objs[:i] + diagonal_worker_objs[i+1:]
+        confs = self.map_workers_via_op(get_bits, noprob_workers,
+                                        throw_errors=True)
+        measured_prob += sum(conf.measure_result.measured_prob for conf in confs)
+        self.logger("Measured prob is {}".format(measured_prob))
+
+        # We only need to ask the diagonals to perform the measurement operation
+        measure_op = WorkerOperation()
+        measure_op.CopyFrom(op)
+        measure_op.measure.measure_result.measured_bits = measured_bits
+        measure_op.measure.measure_result.measured_prob = measured_prob
+        measure_op.measure.soft = False
+        measure_op.measure.reduce = False
+        self.logger("Performing measurement operation")
+        self.map_workers_via_op(measure_op, diagonal_worker_objs, throw_errors=True)
+
+        # Now sync all workers, but the non-diagonals don't need to send any state, only receive.
+        syncop = WorkerOperation()
+        syncop.job_id = op.job_id
+        syncop.sync.diagonal_overwrite = True
+        self.logger("Performing synchronization")
+        self.map_workers_via_op(syncop, [w for _, _, w in self.workers], throw_errors=True)
+
+        return [], (measured_bits, measured_prob)
+
     def send_reduce_measure(self, op: WorkerOperation):
         # Get relevant rows which need to output reductions.
         indices = pbindices_to_indices(op.measure.indices)
@@ -265,6 +325,7 @@ class WorkerPool:
         get_bits = WorkerOperation()
         get_bits.CopyFrom(op)
         get_bits.measure.soft = True
+        get_bits.measure.reduce = False
         first_worker.sock.send(get_bits.SerializeToString())
         conf = WorkerConfirm.FromString(first_worker.sock.recv())
         measured_bits = conf.measure_result.measured_bits
@@ -289,6 +350,7 @@ class WorkerPool:
         reduce_op.measure.measure_result.measured_bits = measured_bits
         reduce_op.measure.measure_result.measured_prob = measured_prob
         reduce_op.measure.soft = False
+        reduce_op.measure.reduce = True
         self.logger("Performing reduction measurement")
         self.map_workers_via_op(reduce_op, all_reduction_workers, throw_errors=True)
 

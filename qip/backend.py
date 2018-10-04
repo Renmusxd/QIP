@@ -1,4 +1,5 @@
 from qip.ext.kronprod import cdot_loop
+from qip.ext.kronprod import reduce_measure
 from qip.ext.kronprod import measure
 from qip.ext.kronprod import soft_measure
 from qip.ext.kronprod import measure_probabilities
@@ -31,7 +32,12 @@ class StateType(object):
     def measure(self, indices: Sequence[int], measured: Optional[int] = None,
                 measured_prob: Optional[float] = None,
                 input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
-        raise NotImplemented("measure not implemented by base class")
+        raise NotImplemented("reduce_measure not implemented by base class")
+
+    def reduce_measure(self, indices: Sequence[int], measured: Optional[int] = None,
+                       measured_prob: Optional[float] = None,
+                       input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+        raise NotImplemented("reduce_measure not implemented by base class")
 
     def soft_measure(self, indices: Sequence[int], measured: Optional[int] = None,
                      input_offset: int = 0) -> Tuple[int, float]:
@@ -114,16 +120,26 @@ class CythonBackend(StateType):
 
     def measure(self, indices: Sequence[int], measured: Optional[int] = None,
                 measured_prob: Optional[float] = None,
+                input_offset: int = 0, output_offset: int = 0):
+        bits, prob = measure(numpy.asarray(indices, dtype=numpy.int32),
+                             self.n, self.state, self.arena,
+                             measured=measured, measured_prob=measured_prob,
+                             input_offset=input_offset, output_offset=output_offset)
+        self.state, self.arena = self.arena, self.state
+        return bits, prob
+
+    def reduce_measure(self, indices: Sequence[int], measured: Optional[int] = None,
+                measured_prob: Optional[float] = None,
                 input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
         # Get an appropriately sized arena
         # new_arena_size = 2**(self.n - len(indices))
         # if new_arena_size < self.arena.shape[0]:
         #     self.arena.resize((new_arena_size,))
 
-        bits, prob = measure(numpy.asarray(indices, dtype=numpy.int32),
-                             self.n, self.state, self.arena,
-                             measured=measured, measured_prob=measured_prob,
-                             input_offset=input_offset, output_offset=output_offset)
+        bits, prob = reduce_measure(numpy.asarray(indices, dtype=numpy.int32),
+                                    self.n, self.state, self.arena,
+                                    measured=measured, measured_prob=measured_prob,
+                                    input_offset=input_offset, output_offset=output_offset)
         # self.state.resize(self.arena.shape)
         self.state, self.arena = self.arena, self.state
 

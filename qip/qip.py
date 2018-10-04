@@ -146,30 +146,13 @@ class Measure(Qubit):
                 item.set_sink(self)
 
     def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
-                     n: int) -> Tuple[int, int]:
+                     n: int) -> Tuple[int, Any]:
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        bits = state.measure(indices)
+        bits, prob = state.measure(indices)
 
-        return self.n, bits
-
-    def remap_index(self, index_map: Mapping[Qubit, Sequence[int]], n: int) -> Mapping[Qubit, Sequence[int]]:
-        """
-        May be override to rearrange qubits if needed
-        :param index_map: map of Qubit -> Index
-        :param n: num qubits
-        :return: new index_map
-        """
-        removed_indices = list(sorted(index_map[q] for q in self.inputs))
-
-        index_to_index_map = {}
-        removed_so_far = 0
-        for i in range(n):
-            index_to_index_map[i] = i - removed_so_far
-            if i == removed_indices[removed_so_far]:
-                removed_so_far += 1
-
-        return {q: [index_to_index_map[i] for i in index_map[q]] for q in index_map}
+        # We measure but don't remove any qubits.
+        return 0, (bits, prob)
 
     def __repr__(self):
         return "M({})".format(",".join(i.__repr__() for i in self.inputs))

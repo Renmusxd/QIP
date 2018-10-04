@@ -86,6 +86,14 @@ class WorkerInstance:
                     if operation.measure.HasField('measure_result'):
                         measured = operation.measure.measure_result.measured_bits
                     m, p = self.state.soft_measure(indices, measured=measured, input_offset=self.inputstartindex)
+                elif operation.measure.reduce:
+                    measured = None
+                    measured_prob = None
+                    if operation.measure.HasField('measure_result'):
+                        measured = operation.measure.measure_result.measured_bits
+                        measured_prob = operation.measure.measure_result.measured_prob
+                    m, p = self.state.reduce_measure(indices, measured=measured, measured_prob=measured_prob,
+                                                     input_offset=self.inputstartindex)
                 else:
                     measured = None
                     measured_prob = None
@@ -94,17 +102,21 @@ class WorkerInstance:
                         measured_prob = operation.measure.measure_result.measured_prob
                     m, p = self.state.measure(indices, measured=measured, measured_prob=measured_prob,
                                               input_offset=self.inputstartindex)
-                self.logger("Reporting m={}\tp={}".format(m,p))
+
+                # For any measurement, report the bits and probabilty then continue (don't report_done).
+                self.logger("Reporting m={}\tp={}".format(m, p))
                 self.serverapi.report_probability(operation.job_id, measured_bits=m, measured_prob=p)
                 continue
 
             elif operation.HasField('sync'):
                 # This logic assumes all workers given equal share, if ever changed then this must be fixed.
                 if self.inputstartindex == self.outputstartindex and self.inputendindex == self.outputendindex:
-                    # Receive output from everything which outputs to same region, add to current input
-                    self.logger.receiving_state(self.job_id)
-                    self.pool.receive_state_increments_from_all(self.job_id, self.state,
-                                                                self.outputstartindex, self.outputendindex)
+                    # If diagonal overwrite is on then don't need to receive anything from other workers.
+                    if not operation.sync.diagonal_overwrite:
+                        # Receive output from everything which outputs to same region, add to current input
+                        self.logger.receiving_state(self.job_id)
+                        self.pool.receive_state_increments_from_all(self.job_id, self.state,
+                                                                    self.outputstartindex, self.outputendindex)
 
                     # Send current input to everything which takes input from same region.
                     if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:
@@ -116,12 +128,14 @@ class WorkerInstance:
                         self.pool.send_state_to_all(self.job_id, self.state, self.inputstartindex, self.inputendindex)
 
                 else:
-                    # Swap input and output
-                    # Send current output to worker along diagonal with in/out equal to our output
-                    self.logger.sending_state(self.job_id)
-                    self.pool.send_state_to_one(self.job_id, self.state,
-                                                self.outputstartindex, self.outputendindex,
-                                                self.outputstartindex, self.outputendindex)
+                    # If diagonal overwrite is on then don't send anything, just receive.
+                    if not operation.sync.diagonal_overwrite:
+                        # Swap input and output
+                        # Send current output to worker along diagonal with in/out equal to our output
+                        self.logger.sending_state(self.job_id)
+                        self.pool.send_state_to_one(self.job_id, self.state,
+                                                    self.outputstartindex, self.outputendindex,
+                                                    self.outputstartindex, self.outputendindex)
 
                     should_receive = True
                     if operation.sync.HasField('set_up_to') and operation.sync.set_up_to:

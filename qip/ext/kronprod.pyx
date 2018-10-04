@@ -270,6 +270,15 @@ def prob_magnitude(double complex[:] vec):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None, int input_offset=0):
+    """
+    Get the bit and probability that could occur from a measurement, but leave the wavefunction intact.
+    :param indices: indices to measure.
+    :param n: number of qubits.
+    :param vec: array of complex values for state.
+    :param measured: intger which was measured (will return this plus probability if supplied).
+    :param input_offset: if vec[0] is not |0> then supply offset.
+    :return: tuple of measured_bits, probability
+    """
     cdef:
         int iter_num = 2**vec.shape[0]
         int len_indices = indices.shape[0]
@@ -318,7 +327,70 @@ def soft_measure(int[:] indices, int n, double complex[:] vec, measured=None, in
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def measure(int[:] indices, int n, double complex[:] vec, double complex[:] out,
-            int input_offset = 0, int output_offset = 0, measured=None, measured_prob=None):
+                   int input_offset = 0, int output_offset = 0, measured=None, measured_prob=None):
+    """
+    Measure the indices and collapse the wavefunction.
+    :param indices: indices to measure.
+    :param n: number of qubits.
+    :param vec: state vector.
+    :param out: output vector for new state.
+    :param input_offset: offset at which state vector starts if not |0>
+    :param output_offset: offset at which output starts if not |0>
+    :param measured: measured bits if known
+    :param measured_prob: measured prob if known.
+    :return: tuple of measured_bits, probability
+    """
+    if measured is not None:
+        if not (0 <= measured < 2**indices.shape[0]):
+            raise ValueError("Measured value must be less than 2**len(indices)")
+    if measured_prob is not None:
+        if not 0.0 < measured_prob <= 1.0:
+            raise ValueError("measured_prob must be 0 < p <= 1")
+
+    cdef:
+        int m
+        double p
+        int i
+        int n_indices = indices.shape[0]
+        int n_non_indices = n - n_indices
+        int vec_end = input_offset + vec.shape[0]
+        int out_end = output_offset + out.shape[0]
+        int n_out = out.shape[0]
+        int vec_row
+        int row_mask = 0
+        int measured_entwine = 0
+        int indices_inc, non_indices_inc
+        double mult_p
+
+    if measured is None or measured_prob is None:
+        m, p = soft_measure(indices, n, vec, measured=measured, input_offset=input_offset)
+    else:
+        m, p = measured, measured_prob
+    mult_p = np.sqrt(1.0 / p)
+
+    with nogil:
+        # Put 1s at all measured indices.
+        for i in range(n_indices):
+            row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
+
+        # Replace 1s with respective measured values
+        measured_entwine = entwine_bit(n_indices, n_non_indices, m, 0, row_mask)
+
+        # Since input index is equal to output index, only iterate over overlapping area
+        for i in range(max(input_offset, output_offset), min(vec_end, out_end)):
+            # Check if there are any differences in measured indices.
+            if (i & row_mask) ^ measured_entwine:
+                out[i - output_offset] = 0
+            else:
+                out[i - output_offset] = vec[i - input_offset] * mult_p
+
+    return m, p
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def reduce_measure(int[:] indices, int n, double complex[:] vec, double complex[:] out,
+                   int input_offset = 0, int output_offset = 0, measured=None, measured_prob=None):
     if measured is not None:
         if not (0 <= measured < 2**indices.shape[0]):
             raise ValueError("Measured value must be less than 2**len(indices)")

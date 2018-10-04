@@ -115,11 +115,13 @@ message Measure {
     optional Indices indices = 1;
     optional MeasureResult measure_result = 2;
     optional bool soft = 3;
+    optional bool reduce = 4;
 }
 
 message Sync {
     // Index up to which to set states.
     optional int64 set_up_to = 1;
+    optional bool diagonal_overwrite = 2;
 }
 
 message WorkerOperation {

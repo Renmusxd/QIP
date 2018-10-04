@@ -82,11 +82,28 @@ class DistributedBackend(StateType):
                    input_offset: int = 0, output_offset: int = 0) -> None:
         raise NotImplemented()
 
-    def measure(self, indices: IndexType, measured: Optional[int] = None,
+    def measure(self, indices: Sequence[int], measured: Optional[int] = None,
                 measured_prob: Optional[float] = None,
-                input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+                input_offset: int = 0, output_offset: int = 0):
         workerop = WorkerOperation()
         workerop.job_id = self.state
+        workerop.measure.reduce = False
+        indices_to_pbindices(indices, workerop.measure.indices)
+
+        self.socket.send(workerop.SerializeToString())
+        conf = WorkerConfirm.FromString(self.socket.recv())
+
+        if conf.HasField('error_message'):
+            raise Exception(conf.error_message)
+        else:
+            return conf.measure_result.measured_bits, conf.measure_result.measured_prob
+
+    def reduce_measure(self, indices: IndexType, measured: Optional[int] = None,
+                       measured_prob: Optional[float] = None,
+                       input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+        workerop = WorkerOperation()
+        workerop.job_id = self.state
+        workerop.measure.reduce = True
         indices_to_pbindices(indices, workerop.measure.indices)
 
         self.socket.send(workerop.SerializeToString())

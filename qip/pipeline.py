@@ -1,7 +1,7 @@
 import numpy
 from qip.util import flatten
 from qip.backend import StateType, InitialState, CythonBackend
-from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Iterable
+from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Any
 
 
 class PipelineObject(object):
@@ -29,17 +29,17 @@ class PipelineObject(object):
         return self.feed_indices(state, [qbitindex[q] for q in self.inputs], n)
 
     def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
-                     n: int) -> Tuple[int, object]:
+                     n: int) -> Tuple[int, Any]:
         """
         Operate on the state of the system.
         :param state: input state
         :param index_groups: array of arrays of indicies used by each input in order.
         :param n: number of qubits
         :param backend: backend to use for matrix operations
-        :return: (state, (num classic bits, int bits))
+        :return: (num qubits removed, some operation annotation)
         """
         # Return identity
-        return (0, 0)
+        return 0, 0
 
     def select_index(self, indices: Sequence[int]) -> Sequence[int]:
         """
