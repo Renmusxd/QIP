@@ -1,8 +1,8 @@
 
 cdef int entwine_bit(int n_indices, int n_non_indices, int v_indices, int v_non_indices, int mask) nogil:
     cdef int n = n_indices + n_non_indices
-    cdef int indices_mask = 1 << (n_indices - 1)
-    cdef int non_indices_mask = 1 << (n_non_indices - 1)
+    cdef int indices_mask = 1 << max(0, (n_indices - 1))
+    cdef int non_indices_mask = 1 << max(0, (n_non_indices - 1))
     cdef int bit_select = 1 << (n - 1)
     cdef int m = 0
     cdef int j

@@ -6,6 +6,7 @@ from __future__ import division
 
 import numpy as np
 cimport cython
+import math
 from cython cimport parallel
 cimport numpy as np
 from libc.stdlib cimport malloc, free
@@ -241,8 +242,8 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
     cdef:
         double[:] p = measure_p
         int len_indices = indices.shape[0]
-        int iter_num = 2**n
-        int i, j
+        long iter_num = 2**n
+        long i, j
         int p_index = 0
         double complex vec_val
     with nogil:
@@ -251,34 +252,67 @@ def measure_probabilities(int[:] indices, int n, double complex[:] vec):
             vec_val = vec[i]
             if vec_val == 0.0:
                 continue
-            p_index = entwine_bit(len_indices, 0, i, 0, -1)
+
+            # Construct index into probability array
+            p_index = 0
+            for j in range(len_indices):
+                p_index = set_bit(p_index, j, get_bit(i, (n-1) - indices[j]))
             p[p_index] = p[p_index] + abs(vec_val)**2
     return measure_p
 
 
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# def measure_top_probabilities(int[:] indices, int n, int m, double complex[:] vec):
-#     measure_mheap = np.zeros(shape=(m,), dtype=np.float64)
-#     measure_pheap = np.zeros(shape=(m,), dtype=np.float64)
-#
-#     cdef:
-#         int[:] ms = measure_mheap
-#         double[:] ps = measure_pheap
-#         int len_indices = indices.shape[0]
-#         int iter_num = 2**n
-#         int i, j
-#         int p_index = 0
-#         double complex vec_val
-#     with nogil:
-#         # Iterating over larger array in order likely better for cache.
-#         for i in range(iter_num):
-#             vec_val = vec[i]
-#             if vec_val == 0.0:
-#                 continue
-#             p_index = entwine_bit(len_indices, 0, i, 0, -1)
-#             p[p_index] = p[p_index] + abs(vec_val)**2
-#     return measure_p
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def measure_top_probabilities(int[:] indices, int n, int top_k, double complex[:] vec):
+    top_k = min(top_k, 2**len(indices))
+
+    measure_mheap = np.zeros(shape=(top_k,), dtype=np.int64)
+    measure_pheap = np.zeros(shape=(top_k,), dtype=np.float64)
+
+    cdef:
+        long[:] ms = measure_mheap
+        double[:] ps = measure_pheap
+        int heap_end = 0
+        int heap_pos, heap_parent
+
+        int len_indices = indices.shape[0]
+        int len_nonindices = n - len_indices
+        long iter_num = 2**len_indices
+        long unmeasured_iters = 2**len_nonindices
+        long m, i, j, vec_index
+        double vec_prob
+        int row_mask
+    with nogil:
+        # Iterate over all measurable values.
+        for m in range(iter_num):
+            row_mask = 0
+            for i in range(len_indices):
+                row_mask = set_bit(row_mask, (n-1) - indices[i], 1)
+
+            vec_prob = 0
+            for j in range(unmeasured_iters):
+                vec_index = entwine_bit(len_indices, len_nonindices, m, j, row_mask)
+                vec_prob += abs(vec[vec_index])**2
+
+            # Now put input heap and bubble
+            heap_pos = heap_end
+            heap_parent = (heap_pos - 1) >> 1
+            if vec_prob >= ps[heap_pos]:
+                ms[heap_pos] = m
+                ps[heap_pos] = vec_prob
+                while heap_pos > 0 and ps[heap_pos] > ps[heap_parent]:
+                    ms[heap_pos], ms[heap_parent] = ms[heap_parent], ms[heap_pos]
+                    ps[heap_pos], ps[heap_parent] = ps[heap_parent], ps[heap_pos]
+
+                    heap_pos = heap_parent
+                    heap_parent = (heap_pos - 1) >> 1
+
+            if heap_end < top_k:
+                heap_end += 1
+
+    measure_m, measure_p = zip(*sorted(zip(measure_mheap, measure_pheap), key=lambda t: t[1], reverse=True))
+
+    return list(measure_m), list(measure_p)
 
 
 @cython.boundscheck(False)
