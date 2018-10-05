@@ -301,6 +301,19 @@ class TestQubitMethods(unittest.TestCase):
                                  q2: [0.5, 0.5, 0.5, 0.5]})
         self.assertTrue(numpy.allclose(c[m1], [0.25, 0.25, 0.25, 0.25]))
 
+    def test_measure_stochastic_top(self):
+        q1 = Qubit(n=2)
+        q2 = Qubit(n=2)
+        m1 = StochasticMeasure(q2, top_k=3)
+        _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
+                                 q2: [0.6, 0.8, 0.0, 0.0]})
+
+        self.assertEqual(c[m1][0][0], 1)
+        self.assertEqual(c[m1][0][1], 0)
+        # Doesn't matter what third index is since it's a tie.
+
+        self.assertTrue(numpy.allclose(c[m1][1], [0.64, 0.36, 0.0]))
+
     def test_fop(self):
         n = 2
         reg1 = Qubit(n=n, default=[1, 2, 3, 4])
