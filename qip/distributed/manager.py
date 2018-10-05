@@ -126,6 +126,8 @@ class InsufficientResources(ValueError):
 
 
 class WorkerPool:
+    MAX_TOP_K = 2048
+
     def __init__(self, n: int, logger: ServerLogger):
         self.n = n
         self.unallocated_workers = []
@@ -202,8 +204,8 @@ class WorkerPool:
             elif op.measure.reduce:
                 return self.send_reduce_measure(op)
             elif op.measure.top_k:
-                if op.measure.top_k > 2048:
-                    pass
+                if op.measure.top_k > WorkerPool.MAX_TOP_K:
+                    raise Exception("Max top_k is {}".format(WorkerPool.MAX_TOP_K))
                 return [], self.send_measure_top(op)
             else:
                 return [], self.send_measure(op)

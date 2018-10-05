@@ -73,7 +73,7 @@ class DistributedBackend(StateType):
 
     def func_apply(self, reg1_indices: IndexType, reg2_indices: IndexType, func: Callable[[int], int],
                    input_offset: int = 0, output_offset: int = 0) -> None:
-        raise NotImplemented()
+        raise NotImplemented("Function application not yet supported in distributed backends.")
 
     def measure(self, indices: Sequence[int], measured: Optional[int] = None,
                 measured_prob: Optional[float] = None,
@@ -109,11 +109,11 @@ class DistributedBackend(StateType):
 
     def soft_measure(self, indices: Sequence[int], measured: Optional[int] = None,
                      input_offset: int = 0):
-        raise NotImplemented()
+        raise NotImplemented("Soft measurement not yet supported in distributed backends.")
 
-    def measure_probabilities(self, indices: IndexType, top_k: int = 1024) -> Tuple[Sequence[int], Sequence[float]]:
+    def measure_probabilities(self, indices: IndexType, top_k: int = 0) -> Tuple[Sequence[int], Sequence[float]]:
         if not top_k:
-            raise NotImplemented("Distributed backends don't support full probability dumps")
+            top_k = pow(2, len(indices))
 
         workerop = WorkerOperation()
         workerop.job_id = self.state
