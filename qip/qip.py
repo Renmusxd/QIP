@@ -162,11 +162,13 @@ class StochasticMeasure(Qubit):
     """
     Measures some quantum input. Outputs the probability distribution
     as though the measurement was carried out repeatedly.
+    If top_k is set then outputs a tuple with indices and probabilities for top k measurements.
     Does not change state.
     """
 
-    def __init__(self, *inputs: Qubit, nosink: bool = False):
+    def __init__(self, *inputs: Qubit, nosink: bool = False, top_k: int = 0):
         super().__init__(*inputs, quantum=False, nosink=nosink)
+        self.top_k = top_k
 
         if not nosink:
             for item in inputs:
@@ -176,8 +178,7 @@ class StochasticMeasure(Qubit):
                      n: int) -> Tuple[int, object]:
         # Get indices and make measurement
         indices = numpy.array(flatten(index_groups), dtype=numpy.int32)
-        probs = state.measure_probabilities(indices)[:]
-
+        probs = state.measure_probabilities(indices, top_k=self.top_k)[:]
         return 0, probs
 
     def __repr__(self) -> str:

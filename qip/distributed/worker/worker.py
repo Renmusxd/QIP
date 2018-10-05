@@ -1,7 +1,7 @@
 """This serves as a main function to run a worker."""
 from qip.distributed.proto import *
 from qip.distributed.proto.conversion import *
-from qip.distributed.worker.worker_backends import SocketServerBackend, SocketWorkerBackend
+from qip.distributed.worker.worker_backends import SocketServerBackend
 from qip.distributed.worker.worker_logger import WorkerLogger, PrintLogger
 from qip.distributed.formatsock import FormatSocket
 from qip.backend import CythonBackend, StateType
@@ -60,9 +60,6 @@ class WorkerInstance:
             operation = self.serverapi.receive_operation()
             self.logger.running_operation(self.job_id, operation)
 
-            print(self.state.state)
-            print(self.state.arena)
-
             self.logger(operation)
             if operation.HasField('close'):
                 break
@@ -98,6 +95,12 @@ class WorkerInstance:
                     m, p = self.state.reduce_measure(indices, measured=measured, measured_prob=measured_prob,
                                                      input_offset=self.inputstartindex,
                                                      output_offset=self.outputstartindex)
+                elif operation.measure.top_k:
+                    top_indices, top_float = self.state.measure_probabilities(indices, top_k=operation.measure.top_k)
+
+                    # An escape hatch from an escape hatch, I know.
+                    self.serverapi.report_top_probs(self.job_id, top_indices, top_float)
+                    continue
                 else:
                     measured = None
                     measured_prob = None
@@ -436,10 +439,14 @@ class WorkerRunner(Thread):
 
         while self.running:
             self.logger.waiting_for_setup()
-            setup = WorkerSetup.FromString(self.socket.recv())
-            self.logger.accepted_setup(setup)
-            worker = WorkerInstance(self.serverapi, self.pool, setup, logger=self.logger)
-            worker.run()
+            cmd = WorkerCommand.FromString(self.socket.recv())
+            if cmd.HasField('setup'):
+                setup = cmd.setup
+                self.logger.accepted_setup(setup)
+                worker = WorkerInstance(self.serverapi, self.pool, setup, logger=self.logger)
+                worker.run()
+            elif cmd.HasField('close'):
+                self.running = False
 
 
 if __name__ == "__main__":

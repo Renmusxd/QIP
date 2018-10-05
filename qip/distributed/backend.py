@@ -118,8 +118,22 @@ class DistributedBackend(StateType):
                      input_offset: int = 0):
         raise NotImplemented()
 
-    def measure_probabilities(self, indices: IndexType) -> Sequence[float]:
-        raise NotImplemented()
+    def measure_probabilities(self, indices: IndexType, top_k: int = 1024) -> Tuple[Sequence[int], Sequence[float]]:
+        if not top_k:
+            raise NotImplemented("Distributed backends don't support full probability dumps")
+
+        workerop = WorkerOperation()
+        workerop.job_id = self.state
+        workerop.measure.top_k = top_k
+        indices_to_pbindices(indices, workerop.measure.indices)
+
+        self.socket.send(workerop.SerializeToString())
+        conf = WorkerConfirm.FromString(self.socket.recv())
+
+        if conf.HasField('error_message'):
+            raise Exception(conf.error_message)
+        else:
+            return list(conf.measure_result.top_k_indices.index), list(conf.measure_result.top_k_probs)
 
     def close(self):
         close_op = WorkerOperation()

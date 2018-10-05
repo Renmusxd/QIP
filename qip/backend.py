@@ -3,11 +3,12 @@ from qip.ext.kronprod import reduce_measure
 from qip.ext.kronprod import measure
 from qip.ext.kronprod import soft_measure
 from qip.ext.kronprod import measure_probabilities
+from qip.ext.kronprod import measure_top_probabilities
 from qip.ext.kronprod import prob_magnitude
 from qip.ext.func_apply import func_apply
 from qip.util import kronselect_dot, gen_edit_indices, InitialState, IndexType, MatrixType
 import numpy
-from typing import Sequence, Mapping, Callable, Optional, Tuple
+from typing import Sequence, Mapping, Callable, Optional, Tuple, Union
 
 
 class StateType(object):
@@ -43,7 +44,9 @@ class StateType(object):
                      input_offset: int = 0) -> Tuple[int, float]:
         raise NotImplemented("measure not implemented by base class")
 
-    def measure_probabilities(self, indices: Sequence[int]) -> Sequence[float]:
+    def measure_probabilities(self, indices: Sequence[int],
+                              top_k: int = 0) -> Union[Sequence[float], Tuple[Sequence[int], Sequence[float]]]:
+        """If top_k is 0 then output array of all probabilities, else tuple of indices, probs for top_k probs."""
         raise NotImplemented("measure_probabilities not implemented by base class")
 
     def close(self):
@@ -131,7 +134,7 @@ class CythonBackend(StateType):
     def reduce_measure(self, indices: Sequence[int], measured: Optional[int] = None,
                 measured_prob: Optional[float] = None,
                 input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
-        # Get an appropriately sized arena
+        # TODO Get an appropriately sized arena
         # new_arena_size = 2**(self.n - len(indices))
         # if new_arena_size < self.arena.shape[0]:
         #     self.arena.resize((new_arena_size,))
@@ -150,5 +153,9 @@ class CythonBackend(StateType):
         return soft_measure(numpy.asarray(indices, dtype=numpy.int32), self.n, self.state,
                             measured=measured, input_offset=input_offset)
 
-    def measure_probabilities(self, indices: Sequence[int]) -> Sequence[float]:
-        return measure_probabilities(numpy.asarray(indices, dtype=numpy.int32), self.n, self.state)
+    def measure_probabilities(self, indices: Sequence[int],
+                              top_k: int = 0) -> Union[Sequence[float], Tuple[Sequence[int], Sequence[float]]]:
+        if top_k:
+            return measure_top_probabilities(numpy.asarray(indices, dtype=numpy.int32), self.n, top_k, self.state)
+        else:
+            return measure_probabilities(numpy.asarray(indices, dtype=numpy.int32), self.n, self.state)

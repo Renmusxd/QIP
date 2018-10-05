@@ -299,6 +299,7 @@ class TestQubitMethods(unittest.TestCase):
         m1 = StochasticMeasure(q2)
         _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
                                  q2: [0.5, 0.5, 0.5, 0.5]})
+        print(c)
         self.assertTrue(numpy.allclose(c[m1], [0.25, 0.25, 0.25, 0.25]))
 
     def test_fop(self):

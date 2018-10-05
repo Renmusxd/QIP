@@ -1,5 +1,5 @@
-from qip.distributed.proto import WorkerSetup, WorkerOperation, WorkerConfirm
-from typing import Optional
+from qip.distributed.proto import WorkerSetup, WorkerOperation, WorkerConfirm, WorkerCommand
+from typing import Optional, Sequence
 
 
 class ServerBackend:
@@ -22,30 +22,16 @@ class ServerBackend:
                            measured_prob: Optional[float] = None):
         raise NotImplemented("Not implemented")
 
-
-class WorkerBackend:
-    def __init__(self):
-        pass
-
-    def send_state(self, state):
-        """Send local state shard to worker"""
+    def report_top_probs(self, job_id: str, top_indices: Sequence[int], top_probs: Sequence[float]):
         raise NotImplemented("Not implemented")
-
-    def receive_state(self, buffer):
-        """Receive new state and save to buffer"""
-        raise NotImplemented("Not implemented")
-
-
-# Socket implementations
-
 
 class SocketServerBackend(ServerBackend):
     def __init__(self, serversocket):
         super().__init__()
         self.serversocket = serversocket
 
-    def receive_setup(self):
-        return WorkerSetup.FromString(self.serversocket.recv())
+    def receive_command(self):
+        return WorkerCommand.FromString(self.serversocket.recv())
 
     def receive_operation(self):
         return WorkerOperation.FromString(self.serversocket.recv())
@@ -65,17 +51,9 @@ class SocketServerBackend(ServerBackend):
             conf.measure_result.measured_prob = measured_prob
         self.serversocket.send(conf.SerializeToString())
 
-
-class SocketWorkerBackend(WorkerBackend):
-    def __init__(self, workersocket, startindex, endindex):
-        super().__init__()
-        self.workersocket = workersocket
-        self.startindex = startindex
-        self.endindex = endindex
-
-    # TODO Implement efficient send and receive state somehow
-    def send_state(self, state):
-        pass
-
-    def receive_state(self, buffer):
-        pass
+    def report_top_probs(self, job_id: str, top_indices: Sequence[int], top_probs: Sequence[float]):
+        conf = WorkerConfirm()
+        conf.job_id = job_id
+        conf.measure_result.top_k_indices.index.extend(top_indices)
+        conf.measure_result.top_k_probs.extend(top_probs)
+        self.serversocket.send(conf.SerializeToString())

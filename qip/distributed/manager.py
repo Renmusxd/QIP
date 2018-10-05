@@ -5,7 +5,7 @@ from collections import OrderedDict
 import random
 import socket
 import ssl
-from typing import Callable, Sequence, List, Tuple, Iterable, Mapping
+from typing import Callable, Sequence, List, Tuple, Iterable, Mapping, Any
 from threading import Thread, Lock, Condition
 import uuid
 
@@ -66,10 +66,10 @@ class Manager:
                 self.logger.done_running_operation(state_handle.state_handle, op)
                 conf = WorkerConfirm()
                 conf.job_id = state_handle.state_handle
+
                 if returned_data:
-                    measured_bits, measured_prob = returned_data
-                    conf.measure_result.measured_bits = measured_bits
-                    conf.measure_result.measured_prob = measured_prob
+                    conf.measure_result.CopyFrom(returned_data)
+
                 sock.send(conf.SerializeToString())
         except IOError as e:
             self.logger.log_error("Unknown exception: {}".format(e))
@@ -170,7 +170,8 @@ class WorkerPool:
         # Make sure all workers were allocated.
         assert len(self.unallocated_workers) == 0
 
-        workersetup = WorkerSetup()
+        workercmd = WorkerCommand()
+        workersetup = workercmd.setup
         workersetup.n = self.n
         workersetup.state_handle = job_id
         workersetup.states.extend(setup.states)
@@ -189,9 +190,9 @@ class WorkerPool:
             workersetup.state_index_end = inputend
             workersetup.output_index_start = outputstart
             workersetup.output_index_end = outputend
-            worker.sock.send(workersetup.SerializeToString())
+            worker.sock.send(workercmd.SerializeToString())
 
-    def send_op(self, op: WorkerOperation):
+    def send_op(self, op: WorkerOperation) -> Tuple[Sequence['AnnotatedSocket'], Optional[MeasureResult]]:
         if op.HasField('kronprod'):
             self.send_kronprod(op)
             return [], None
@@ -200,8 +201,12 @@ class WorkerPool:
                 raise NotImplemented("Need to implement soft measurement")
             elif op.measure.reduce:
                 return self.send_reduce_measure(op)
+            elif op.measure.top_k:
+                if op.measure.top_k > 2048:
+                    pass
+                return [], self.send_measure_top(op)
             else:
-                return self.send_measure(op)
+                return [], self.send_measure(op)
 
     def send_kronprod(self, op: WorkerOperation):
         # Send to all
@@ -238,8 +243,7 @@ class WorkerPool:
             reduction_workers[inputs].append(worker)
         return reduction_workers
 
-    def send_measure(self, op: WorkerOperation):
-        print(self.workers)
+    def send_measure(self, op: WorkerOperation) -> MeasureResult:
         diagonal_workers = list(sorted((inputs, outputs, workers) for inputs, outputs, workers in self.workers
                                        if inputs == outputs))
         diagonal_worker_objs = [w for _, _, w in diagonal_workers]
@@ -294,9 +298,60 @@ class WorkerPool:
         self.logger("Performing synchronization")
         self.map_workers_via_op(syncop, [w for _, _, w in self.workers], throw_errors=True)
 
-        return [], (measured_bits, measured_prob)
+        measure_res = MeasureResult()
+        measure_res.measured_bits = measured_bits
+        measure_res.measured_prob = measured_prob
+        return measure_res
 
-    def send_reduce_measure(self, op: WorkerOperation):
+    def send_measure_top(self, op: WorkerOperation) -> MeasureResult:
+        diagonal_workers = list(sorted((inputs, outputs, workers) for inputs, outputs, workers in self.workers
+                                       if inputs == outputs))
+        diagonal_worker_objs = [w for _, _, w in diagonal_workers]
+
+        # Ask workers for top_k from each
+        confs = self.map_workers_via_op(op, diagonal_worker_objs, throw_errors=True)
+
+        print(confs)
+
+        # Get minimum probability in each worker (for error measurement).
+        conf_mins = [min(conf.measure_result.top_k_probs) for conf in confs]
+
+        # Get each tuple sorted by index for aggregation. Reverse order speeds up pop()
+        conf_results = [list(sorted(zip(conf.measure_result.top_k_indices.index, conf.measure_result.top_k_probs),
+                                    reverse=True))
+                        for conf in confs]
+        total_results = sum(len(res) for res in conf_results)
+
+        agg_top = []
+        while total_results > 0:
+            # Choose largest possible index as minimum
+            min_index = min(res[-1][0] for res in conf_results)
+
+            agg_p = 0
+            agg_err = 0
+            for i, res in enumerate(conf_results):
+                # If the index appears for a given worker, add it's prob
+                if res and res[-1][0] == min_index:
+                    _, p = res.pop()
+                    agg_p += p
+                    total_results -= 1
+
+                # Otherwise add the minimum prob returns by that worker to the possible error.
+                else:
+                    agg_err += conf_mins[i]
+            agg_top.append((min_index, agg_p, agg_err))
+
+        # Now sort by decreasing probability
+        top_k_items = sorted(agg_top, key=lambda t: t[1], reverse=True)
+        top_indices, top_probs, top_errors = zip(*top_k_items)
+
+        measure_res = MeasureResult()
+        measure_res.top_k_indices.index.extend(top_indices[:op.measure.top_k])
+        measure_res.top_k_probs.extend(top_probs[:op.measure.top_k])
+        measure_res.top_k_errors.extend(top_errors[:op.measure.top_k])
+        return measure_res
+
+    def send_reduce_measure(self, op: WorkerOperation) -> Tuple[Sequence['AnnotatedSocket'], MeasureResult]:
         # Get relevant rows which need to output reductions.
         indices = pbindices_to_indices(op.measure.indices)
         threshold = pow(2, self.n - len(indices))
@@ -377,7 +432,11 @@ class WorkerPool:
         self.logger("Closed {} workers".format(len(done_workers)))
 
         self.workers = remaining_workers
-        return done_workers, (measured_bits, measured_prob)
+
+        measure_res = MeasureResult()
+        measure_res.measured_bits = measured_bits
+        measure_res.measured_prob = measured_prob
+        return done_workers, measure_res
 
     def send_to_each_of(self, op: WorkerOperation, workers: Iterable['AnnotatedSocket']):
         for i, worker in enumerate(workers):

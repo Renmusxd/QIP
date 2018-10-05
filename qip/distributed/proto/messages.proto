@@ -92,6 +92,13 @@ message WorkerSetup {
     optional StateType statetype = 9;
 }
 
+message WorkerCommand {
+    oneof commands {
+        WorkerSetup setup = 1;
+        bool shutdown = 2;
+    }
+}
+
 // Tell the workers to perform an action.
 message MatrixOp {
     optional Indices indices = 1;
@@ -109,6 +116,10 @@ message KronProd {
 message MeasureResult {
     optional int32 measured_bits = 1;
     optional double measured_prob = 2;
+
+    optional Indices top_k_indices = 3;
+    repeated double top_k_probs = 4 [packed = true];
+    repeated double top_k_errors = 5 [packed = true];
 }
 
 message Measure {
@@ -116,6 +127,7 @@ message Measure {
     optional MeasureResult measure_result = 2;
     optional bool soft = 3;
     optional bool reduce = 4;
+    optional int32 top_k = 5;
 }
 
 message Sync {
