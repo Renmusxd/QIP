@@ -1,7 +1,7 @@
 import numpy
 from qip.util import flatten
 from qip.backend import StateType, InitialState, CythonBackend
-from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Any
+from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Any, Union, Type
 
 
 class PipelineObject(object):
@@ -13,8 +13,8 @@ class PipelineObject(object):
         # PipelineObjects don't be default contribute to qubit circuit.
         self.n = n
 
-    def run(self, state: InitialState = None, feed: Mapping['PipelineObject', InitialState] = None, **kwargs):
-        return run(self, state=state, feed=feed, **kwargs)
+    def run(self, feed: Mapping['PipelineObject', InitialState] = None, **kwargs):
+        return run(self, feed=feed, **kwargs)
 
     def feed(self, state: StateType, qbitindex: Mapping['PipelineObject', Sequence[int]],
              n: int) -> Tuple[int, object]:
@@ -68,56 +68,69 @@ class PipelineObject(object):
         return hash(repr(self))
 
 
-def run(*args: PipelineObject, state: InitialState = None, feed: Mapping[PipelineObject, InitialState] = None,
-        statetype=numpy.complex128, strict: bool = False,
-        backend_constructor: Callable[[int, Sequence[Tuple[int]], Sequence[Sequence[complex]]], StateType] = CythonBackend.make_state, **kwargs):
+def run(*args: PipelineObject,
+        feed: Mapping[Union[PipelineObject, Tuple[PipelineObject, ...]], InitialState] = None,
+        strict: bool = False,
+        backend_constructor: Callable[[int, Sequence[Tuple[int, ...]], Sequence[Sequence[complex]]], StateType] = None,
+        statetype: Type = numpy.complex128,
+        **kwargs):
     """
     Runs pipeline using all qubits in *args. Produces an output state based on input.
     :param args: list of qubits to evaluate
-    :param state: full state of n qbits
-    :param feed: feed of individual qbit states
+    :param feed: feed of individual qbit states - qbit/qbits : state
     :param statetype: type of state data (should be complex numpy value).
     :param strict: requires all qubits to have states in feed, none implicitly defined as |0>
     :param backend_constructor
-    :return: state of full qubit system (2**n array)
+    :return: state handle, output dictionary
     """
     if feed is None:
         feed = {}
     else:
-        feed = {k: feed[k] for k in feed}
+        # Copy to dictionary, convert non-tuples to tuples
+        feed = {(k if type(k) == tuple else (k,)): feed[k] for k in feed}
+
+    # Flatten keys for the ones which are qubits
+    all_qubits_in_feed = list(flatten(feed.keys()))
+
+    if backend_constructor is None:
+        backend_constructor = CythonBackend.make_state
 
     # Frontier contains all qubits required for execution
     # Assume 0 unless in feed
     frontier, graphnodes = get_deps(*args, feed=feed)
     for qubit in frontier:
-        if qubit not in feed and qubit.default is not None:
+        if qubit not in all_qubits_in_feed and qubit.default is not None:
             if type(qubit.default) == int:
                 if 0 < qubit.default < 2**qubit.n:
-                    feed[qubit] = numpy.zeros((2**qubit.n,))
-                    feed[qubit][qubit.default] = 1.0
+                    feed[(qubit,)] = numpy.zeros((2**qubit.n,))
+                    feed[(qubit,)][qubit.default] = 1.0
                 # if it's 0 then not defining it is faster
             else:
-                feed[qubit] = qubit.default
+                feed[(qubit,)] = qubit.default
 
-    qbits = list(sorted(feed.keys(), key=lambda q: q.qid))
     frontier = list(sorted(frontier, key=lambda q: q.qid))
 
     if strict:
-        missing_qubits = [qubit for qubit in frontier if qubit not in feed]
+        missing_qubits = [qubit for qubit in frontier if qubit not in all_qubits_in_feed]
         if len(missing_qubits):
             raise ValueError("Missing Qubit states for: {}".format(missing_qubits))
 
     qbitindex = {}
     n = 0
-    for qbit in sorted(frontier, key=lambda q: q.qid):
+    for qbit in frontier:
         qbitindex[qbit] = [i for i in range(n, n + qbit.n)]
         n += qbit.n
 
-    feed_index_groups = [qbitindex[qbit] for qbit in qbits]
-    feed_states = [feed[qbits[qindex]] for qindex in range(len(qbits))]
+    feed_index_groups = [sum((qbitindex[q] for q in qs), []) for qs in feed]
+    feed_states = [feed[qs] for qs in feed]
 
-    state = backend_constructor(n, feed_index_groups, feed_states,
-                                state=state, statetype=statetype)
+    # In case they used the deprecated state argument
+    # Convert state into a single index group for all indices.
+    if 'state' in kwargs and kwargs['state']:
+        feed_index_groups = [tuple(range(n))]
+        feed_states = [kwargs['state']]
+
+    state = backend_constructor(n, feed_index_groups, feed_states, statetype=statetype)
 
     return feed_forward(frontier, state, graphnodes)
 

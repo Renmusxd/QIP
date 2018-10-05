@@ -60,43 +60,33 @@ class CythonBackend(StateType):
 
     @staticmethod
     def make_state(n: int, index_groups: Sequence[Sequence[int]], feed_list: Sequence[InitialState],
-                   state: InitialState = None, 
                    inputstartindex: Optional[int] = None, inputendindex: Optional[int] = None,
                    outputstartindex: Optional[int] = None, outputendindex: Optional[int] = None,
                    statetype: type = numpy.complex128) -> 'CythonBackend':
-        if state is None:
-            if inputstartindex is None:
-                inputstartindex = 0
-            if inputendindex is None:
-                inputendindex = 2**n
-            if outputstartindex is None:
-                outputstartindex = 0
-            if outputendindex is None:
-                outputendindex = 2**n
 
-            state = numpy.zeros(inputendindex - inputstartindex, dtype=statetype)
+        if inputstartindex is None:
+            inputstartindex = 0
+        if inputendindex is None:
+            inputendindex = 2 ** n
+        if outputstartindex is None:
+            outputstartindex = 0
+        if outputendindex is None:
+            outputendindex = 2 ** n
 
-            if len(feed_list) == 0:
-                state[0] = 1
+        state = numpy.zeros(inputendindex - inputstartindex, dtype=statetype)
 
-            # Set all the entries in state to product of matrix entries
-            for index, flips in gen_edit_indices(index_groups, n - 1):
-                # Skip out of range
-                if index < inputstartindex or index >= inputendindex:
-                    continue
-                # Make index value
-                state[index - inputstartindex] = 1.0
-                for qindex, flip in enumerate(flips):
-                    state[index - inputstartindex] = state[index - inputstartindex] * feed_list[qindex][flip]
-        elif type(state) == int:
-            stateint = state - inputstartindex
-            state = numpy.zeros(2 ** n, dtype=statetype)
-            if stateint > 0:
-                state[stateint] = 1.0
-        elif len(state) != 2 ** n:
-            raise ValueError("State size must be 2**n")
-        elif type(state) == list:
-            state = numpy.array(state)
+        if len(feed_list) == 0:
+            state[0] = 1
+
+        # Set all the entries in state to product of matrix entries
+        for index, flips in gen_edit_indices(index_groups, n - 1):
+            # Skip out of range
+            if index < inputstartindex or index >= inputendindex:
+                continue
+            # Make index value
+            state[index - inputstartindex] = 1.0
+            for qindex, flip in enumerate(flips):
+                state[index - inputstartindex] = state[index - inputstartindex] * feed_list[qindex][flip]
 
         arena = numpy.ndarray(outputendindex - outputstartindex, dtype=statetype)
         return CythonBackend(n, state, arena)

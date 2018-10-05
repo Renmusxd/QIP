@@ -30,14 +30,7 @@ class DistributedBackend(StateType):
 
     @staticmethod
     def make_state(n: int, index_groups: Sequence[Sequence[int]], feed_list: Sequence[InitialState],
-                   state: InitialState = None, startindex: Optional[int] = None, endindex: Optional[int] = None,
                    statetype: type = numpy.complex128) -> StateType:
-        if startindex is not None or endindex is not None:
-            raise ValueError("Distributed backends don't yet support subsections")
-
-        if state is not None:
-            raise ValueError("Cannot feed full state to distributed backend, only individual qubit states.")
-
         distbackend = DistributedBackend(n)
 
         setup_message = StateSetup()

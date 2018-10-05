@@ -299,7 +299,6 @@ class TestQubitMethods(unittest.TestCase):
         m1 = StochasticMeasure(q2)
         _, c = run(m1, q1, feed={q1: [0.0, 0.0, 1.0, 0.0],
                                  q2: [0.5, 0.5, 0.5, 0.5]})
-        print(c)
         self.assertTrue(numpy.allclose(c[m1], [0.25, 0.25, 0.25, 0.25]))
 
     def test_fop(self):
@@ -362,6 +361,17 @@ class TestQubitMethods(unittest.TestCase):
                                      q2: [pow(2, -0.5), pow(2, -0.5)]})
         self.assertTrue(numpy.allclose(numpy.abs(o), [0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5]))
 
+    def test_rop_tuplefeed(self):
+        q1 = Qubit(n=1)
+        q2 = Qubit(n=1)
+        r2 = Rm(2, q2)
+        o1, _ = run(q1, r2, feed={q1: [1.0, 0.0], q2: [0.0, 1.0]})
+        o2, _ = run(q1, r2, feed={(q1, q2): [0.0, 1.0, 0.0, 0.0]})
+        o3, _ = run(q1, r2, feed={(q2, q1): [0.0, 0.0, 1.0, 0.0]})
+
+        self.assertTrue(numpy.allclose(numpy.abs(o1), [0, 1.0, 0, 0]))
+        self.assertTrue(numpy.allclose(numpy.abs(o2), [0, 1.0, 0, 0]))
+        self.assertTrue(numpy.allclose(numpy.abs(o3), [0, 1.0, 0, 0]))
 
 
 if __name__ == '__main__':
