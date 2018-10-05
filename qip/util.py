@@ -149,7 +149,7 @@ def bitarray_to_uint(bits: Sequence[int]) -> int:
     return s
 
 
-def flatten(lst: Sequence[Iterable[T]]) -> List[T]:
+def flatten(lst: Iterable[Iterable[T]]) -> List[T]:
     listgen = [item if isinstance(item, collections.Iterable) else (item,) for item in lst]
     return [item for sublist in listgen for item in sublist]
 
