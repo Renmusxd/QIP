@@ -1,6 +1,6 @@
 from qip.pipeline import PipelineObject
 from qip.util import flatten
-from qip.backend import StateType, InitialState
+from qip_backend import StateType, InitialState
 import numpy
 from typing import Sequence, Mapping, Tuple, Any, Callable, Union, Optional, Iterable, Type, cast
 

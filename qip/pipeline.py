@@ -1,6 +1,6 @@
 import numpy
 from qip.util import flatten
-from qip.backend import StateType, InitialState, CythonBackend
+from qip_backend import StateType, InitialState, RustBackend
 from typing import Mapping, Sequence, Tuple, Callable, AbstractSet, Any, Union, Type
 
 
@@ -93,7 +93,7 @@ def run(*args: PipelineObject,
     all_qubits_in_feed = list(flatten(feed.keys()))
 
     if backend_constructor is None:
-        backend_constructor = CythonBackend.make_state
+        backend_constructor = RustBackend.make_state
 
     # Frontier contains all qubits required for execution
     # Assume 0 unless in feed

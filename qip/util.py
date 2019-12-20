@@ -4,11 +4,12 @@ import numpy
 import collections
 from typing import Mapping, Union, Sequence, MutableSequence, Tuple, Any
 from typing import Optional, Callable, TypeVar, Iterable, List, cast
+from qip_backend import IndexType, MatrixType
 
-InitialState = Union[MutableSequence[complex], int, numpy.ndarray]
-# This should be Anything subscriptable
-IndexType = Union[int, Tuple[int, ...]]
-MatrixType = Any
+# InitialState = Union[MutableSequence[complex], int, numpy.ndarray]
+# # This should be Anything subscriptable
+# IndexType = Union[int, Tuple[int, ...]]
+# MatrixType = Any
 T = TypeVar('T')
 
 

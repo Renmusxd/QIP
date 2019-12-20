@@ -1,7 +1,7 @@
 from qip.qip import Qubit, OpConstructor
 from qip.qubit_util import QubitOpWrapper
 from qip.util import flatten
-from qip.backend import MatrixType, StateType, IndexType
+from qip_backend import MatrixType, StateType, IndexType
 import numpy
 from typing import Sequence, Tuple, Mapping, Union, Any, Callable, cast
 

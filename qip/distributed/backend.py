@@ -1,8 +1,7 @@
 from qip.distributed.proto import *
 from qip.distributed.formatsock import FormatSocket
 from qip.distributed.proto.conversion import *
-from qip.backend import StateType, InitialState
-from qip.util import InitialState, IndexType, MatrixType
+from qip_backend import IndexType, MatrixType, InitialState, StateType
 from qip.operators import CMat, SwapMat
 from typing import Union, Sequence, Any, Tuple, Mapping, Callable, Optional, MutableSequence, cast
 import numpy

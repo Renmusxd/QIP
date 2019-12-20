@@ -25,6 +25,7 @@ class ServerBackend:
     def report_top_probs(self, job_id: str, top_indices: Sequence[int], top_probs: Sequence[float]):
         raise NotImplemented("Not implemented")
 
+
 class SocketServerBackend(ServerBackend):
     def __init__(self, serversocket):
         super().__init__()
