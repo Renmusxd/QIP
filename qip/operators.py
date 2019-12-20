@@ -10,11 +10,18 @@ class MatrixOp(Qubit):
     def __init__(self, *inputs: Qubit, **kwargs):
         super().__init__(*inputs, **kwargs)
         self.ms = None
+        self.dagger = kwargs.get("dagger", False)
 
     def feed_indices(self, state: StateType, index_groups: Sequence[Sequence[int]],
                      n: int) -> Tuple[int, int]:
         if self.ms is None:
             self.ms = self.makemats(index_groups)
+            if self.dagger:
+                self.ms = {
+                    item[0]: item[1].conj().T
+                    for item in self.ms.items()
+                }
+
         state.kronselect_dot(self.ms)
         return 0, 0
 
@@ -245,6 +252,20 @@ class CMat(object):
                 return 0.0
         else:
             raise ValueError("CMat can only be indexed with M[i,j] not M[{}]".format(item))
+
+    def conj(self):
+        return CMat(self.m.conj())
+
+    @property
+    def T(self):
+        return CMat(self.m.T)
+
+    def numpy(self):
+        mat = numpy.zeros(shape=self.shape, dtype=numpy.complex128)
+        for i in range(mat.shape[0]):
+            for j in range(mat.shape[1]):
+                mat[i, j] = self[i, j]
+        return mat
 
 
 class FOp(Qubit):
