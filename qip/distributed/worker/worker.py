@@ -305,10 +305,8 @@ class WorkerPoolServer(Thread):
             raise Exception("Job ids do not match: {}/{}".format(job_id, syncaccept.job_id))
         inflight = 0
 
-        # Break abstraction barrier now
-        # TODO: unbreak it
         last_index = 0
-        total_size = len(state.state)
+        total_size = state.get_state_size()
         while last_index < total_size:
             while inflight < syncaccept.max_inflight and last_index < total_size:
                 end_index = last_index + min(total_size - last_index, syncaccept.chunk_size)
@@ -316,7 +314,7 @@ class WorkerPoolServer(Thread):
                 syncstate = SyncState()
                 syncstate.job_id = job_id
                 syncstate.rel_start_index = last_index
-                vec_to_pbvec(state.state[last_index:end_index], pbvec=syncstate.data)
+                vec_to_pbvec(state.get_relative_range(last_index, end_index), pbvec=syncstate.data)
 
                 inflight += 1
                 last_index = end_index
@@ -349,9 +347,11 @@ class WorkerPoolServer(Thread):
             # Break abstraction barrier now
             # TODO: unbreak it
             if overwrite:
-                state.state[relstart:relstart+len(data)] = data
+                state.overwrite_relative_range(relstart, relstart+len(data), data)
+                # state.state[relstart:relstart+len(data)] = data
             else:
-                state.state[relstart:relstart+len(data)] += data
+                state.addto_relative_range(relstart, relstart+len(data), data)
+                # state.state[relstart:relstart+len(data)] += data
 
             sock.send(syncaccept.SerializeToString())
             running = not syncstate.done
@@ -451,10 +451,13 @@ class WorkerRunner(Thread):
 
 if __name__ == "__main__":
     host, port = 'localhost', 1708
+    worker_n = 28
     if len(sys.argv) > 1:
         host = sys.argv[1]
     if len(sys.argv) > 2:
         port = int(sys.argv[2])
-    wr = WorkerRunner(host, port)
+    if len(sys.argv) > 3:
+        worker_n = int(sys.argv[3])
+    wr = WorkerRunner(host, port, worker_n=worker_n)
     wr.start()
     wr.join()

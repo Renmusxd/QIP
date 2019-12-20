@@ -49,6 +49,18 @@ class StateType(object):
         """If top_k is 0 then output array of all probabilities, else tuple of indices, probs for top_k probs."""
         raise NotImplemented("measure_probabilities not implemented by base class")
 
+    def get_state_size(self) -> int:
+        raise NotImplemented("get_state_size not implemented by base class")
+
+    def get_relative_range(self, start: int, end: int) -> Sequence[complex]:
+        raise NotImplemented("get_relative_range not implemented by base class")
+
+    def overwrite_relative_range(self, start: int, end: int, data: Sequence[complex]):
+        raise NotImplemented("overwrite_relative_range not implemented by base class")
+
+    def addto_relative_range(self, start: int, end: int, data: Sequence[complex]):
+        raise NotImplemented("addto_relative_range not implemented by base class")
+
     def close(self):
         pass
 
@@ -122,8 +134,8 @@ class CythonBackend(StateType):
         return bits, prob
 
     def reduce_measure(self, indices: Sequence[int], measured: Optional[int] = None,
-                measured_prob: Optional[float] = None,
-                input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
+                       measured_prob: Optional[float] = None,
+                       input_offset: int = 0, output_offset: int = 0) -> Tuple[int, float]:
         # TODO Get an appropriately sized arena
         # new_arena_size = 2**(self.n - len(indices))
         # if new_arena_size < self.arena.shape[0]:
@@ -149,3 +161,15 @@ class CythonBackend(StateType):
             return measure_top_probabilities(numpy.asarray(indices, dtype=numpy.int32), self.n, top_k, self.state)
         else:
             return measure_probabilities(numpy.asarray(indices, dtype=numpy.int32), self.n, self.state)
+
+    def get_state_size(self) -> int:
+        return len(self.state)
+
+    def get_relative_range(self, start: int, end: int) -> Sequence[complex]:
+        return self.state[start:end]
+
+    def overwrite_relative_range(self, start: int, end: int, data: Sequence[complex]):
+        self.state[start:end] = data
+
+    def addto_relative_range(self, start: int, end: int, data: Sequence[complex]):
+        self.state[start:end] += data
